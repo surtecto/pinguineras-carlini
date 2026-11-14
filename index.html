@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pingüineras de Carlini</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <p class="eyebrow">Isla 25 de Mayo · Shetland del Sur · ZAEP N.º 132</p>
+    <h1>Pingüineras de Carlini</h1>
+    <p class="lede">Detecta colonias de pingüinos por la mancha de guano en imágenes satelitales y aéreas, mide su superficie y estima parejas reproductoras.</p>
+  </div>
+  <nav class="toplinks"><a href="manual.html">Manual de uso</a><a href="https://github.com/surtecto/pinguineras-carlini">Código y datos</a></nav>
+  <dl class="fix">
+    <div><dt>Base Carlini</dt><dd>62°14′ S&ensp;58°40′ O</dd></div>
+    <div><dt>Punta Stranger</dt><dd>62°16′ S&ensp;58°37′ O</dd></div>
+    <div><dt>Papúa 2018/19</dt><dd>5.383 parejas</dd></div>
+  </dl>
+</header>
+
+<main class="work">
+
+  <aside class="panel controls" aria-label="Controles">
+
+    <section class="block">
+      <h2><span class="step">1</span>Imagen</h2>
+      <div id="s2box" class="col">
+        <div class="field">
+          <label for="s2cat">Escenas Sentinel-2 reales de la Península Potter</label>
+          <select id="s2cat"></select>
+        </div>
+        <details class="live">
+          <summary>Buscar otras fechas y sectores en el archivo Sentinel-2</summary>
+          <div class="col">
+            <div class="field"><label for="s2sector">Sector</label><select id="s2sector"></select></div>
+            <div class="field"><label for="s2season">Temporada</label><select id="s2season"></select></div>
+            <button class="btn" id="s2go" type="button">Buscar escenas</button>
+            <div class="col" id="s2res" aria-live="polite"></div>
+            <p class="hint">Lee en vivo el archivo abierto de Copernicus en la nube: sólo baja el recorte del sector, unos pocos megabytes por escena.</p>
+          </div>
+        </details>
+      </div>
+      <label class="btn primary" for="file">Cargar una imagen propia</label>
+      <input id="file" type="file" accept=".tif,.tiff,.png,.jpg,.jpeg,.webp,image/tiff,image/png,image/jpeg,image/webp" class="visually-hidden">
+      <p class="hint">GeoTIFF (con bandas y georreferencia), PNG o JPG. También se puede soltar el archivo sobre el visor. La imagen no sale de este navegador.</p>
+      <div class="field">
+        <label for="maxpx">Detalle del análisis</label>
+        <select id="maxpx">
+          <option value="4">Estándar: hasta 4 megapíxeles</option>
+          <option value="9">Sector amplio o mucho detalle: hasta 9 megapíxeles</option>
+        </select>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="demoSat" type="button">Ejemplo sintético</button>
+        <button class="btn ghost" id="demoSat2" type="button">Sintético posterior</button>
+        <button class="btn ghost" id="demoDrone" type="button">Dron sintético</button>
+      </div>
+      <p class="hint" id="sceneNote"></p>
+    </section>
+
+    <section class="block">
+      <h2><span class="step">2</span>Bandas y escala</h2>
+      <div class="field">
+        <label for="preset">Orden de bandas</label>
+        <select id="preset">
+          <option value="rgb">Rojo, verde, azul</option>
+          <option value="bgrn">Azul, verde, rojo, infrarrojo (PlanetScope, Sentinel-2 a 10 m)</option>
+          <option value="wv8">WorldView-2/3, 8 bandas</option>
+          <option value="l8">Landsat 8/9, bandas 1 a 7</option>
+          <option value="s2">Sentinel-2, bandas 1 a 12 apiladas</option>
+          <option value="custom">Elegir a mano</option>
+        </select>
+      </div>
+      <div class="bands" id="bandGrid">
+        <div class="field"><label for="bR">Rojo</label><select id="bR"></select></div>
+        <div class="field"><label for="bG">Verde</label><select id="bG"></select></div>
+        <div class="field"><label for="bB">Azul</label><select id="bB"></select></div>
+        <div class="field"><label for="bN">Infrarrojo cercano</label><select id="bN"></select></div>
+        <div class="field"><label for="bS">Infrarrojo medio</label><select id="bS"></select></div>
+      </div>
+      <div class="field">
+        <label for="gsd">Tamaño de píxel de la imagen original (m)</label>
+        <div class="row tight">
+          <input id="gsd" type="number" min="0" step="any" inputmode="decimal" placeholder="por ejemplo 0,5">
+          <button class="btn" id="toolMeasure" type="button" aria-pressed="false">Medir</button>
+        </div>
+        <p class="hint" id="gsdNote"></p>
+      </div>
+      <div class="measure" id="measureBox" hidden>
+        <p class="hint" id="measureTxt"></p>
+        <div class="row tight">
+          <input id="measureM" type="number" min="0" step="any" inputmode="decimal" placeholder="distancia real (m)" aria-label="Distancia real entre los dos puntos, en metros">
+          <button class="btn" id="measureApply" type="button">Aplicar</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2><span class="step">3</span>Relieve</h2>
+      <label class="btn" for="demFile">Cargar modelo de elevación</label>
+      <input id="demFile" type="file" accept=".tif,.tiff,image/tiff" class="visually-hidden">
+      <p class="hint" id="demNote"></p>
+      <div id="demBox" hidden>
+        <label class="check"><input id="terrOn" type="checkbox"> Descartar lo que esté fuera de estos límites</label>
+        <div class="slider"><label for="tSlope">Pendiente máxima <output id="oTSlope"></output></label><input id="tSlope" type="range" min="5" max="60" step="1"></div>
+        <div class="slider"><label for="tElev">Cota máxima <output id="oTElev"></output></label><input id="tElev" type="range" min="5" max="400" step="5"></div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2><span class="step">4</span>Detección del guano</h2>
+      <div class="seg" role="tablist" aria-label="Método de detección">
+        <button role="tab" id="mRule" aria-selected="true" type="button">Regla espectral</button>
+        <button role="tab" id="mML" aria-selected="false" type="button">Con muestras</button>
+      </div>
+
+      <div id="ruleBox">
+        <p class="hint">El guano de dieta de krill es rosado: refleja más rojo que azul y absorbe en el verde. Los umbrales cambian con cada escena; ajustarlos mirando el visor.</p>
+        <label class="check"><input id="pRel" type="checkbox"> Umbrales relativos a cada escena</label>
+        <div class="slider" id="rowKri"><label for="pKri">Enrojecimiento: desvíos sobre el suelo típico <output id="oKri"></output></label><input id="pKri" type="range" min="1" max="8" step="0.1"></div>
+        <div class="slider" id="rowKax"><label for="pKax">Tinte rosado: desvíos sobre el suelo típico <output id="oKax"></output></label><input id="pKax" type="range" min="0" max="6" step="0.1"></div>
+        <p class="hint" id="relNote"></p>
+        <div class="slider" id="rowRi"><label for="pRi">Enrojecimiento mínimo <output id="oRi"></output></label><input id="pRi" type="range" min="0" max="0.5" step="0.005"></div>
+        <div class="slider" id="rowAx"><label for="pAx">Tinte rosado mínimo <output id="oAx"></output></label><input id="pAx" type="range" min="-0.08" max="0.12" step="0.002"></div>
+        <div class="slider"><label for="pLmin">Brillo mínimo <output id="oLmin"></output></label><input id="pLmin" type="range" min="0" max="0.6" step="0.01"></div>
+        <div class="slider"><label for="pLmax">Brillo máximo <output id="oLmax"></output></label><input id="pLmax" type="range" min="0.3" max="1.3" step="0.01"></div>
+        <div class="slider" id="rowNdvi"><label for="pNdvi">Vegetación: NDVI máximo <output id="oNdvi"></output></label><input id="pNdvi" type="range" min="-0.2" max="0.9" step="0.01"></div>
+        <div class="slider" id="rowNdwi"><label for="pNdwi">Agua: NDWI máximo <output id="oNdwi"></output></label><input id="pNdwi" type="range" min="-0.5" max="0.8" step="0.01"></div>
+        <div class="slider" id="rowNdsi"><label for="pNdsi">Nieve: NDSI máximo <output id="oNdsi"></output></label><input id="pNdsi" type="range" min="-0.2" max="0.9" step="0.01"></div>
+        <button class="btn ghost" id="ruleReset" type="button">Volver a los umbrales iniciales</button>
+      </div>
+
+      <div id="mlBox" hidden>
+        <p class="hint">Elegir una clase y tocar la imagen donde se la reconoce. Con dos o tres toques de guano y algunos de lo que lo rodea, el clasificador de máxima verosimilitud separa las clases.</p>
+        <div class="chips" id="chips" role="radiogroup" aria-label="Clase de la muestra"></div>
+        <div class="slider"><label for="brush">Radio del pincel <output id="oBrush"></output></label><input id="brush" type="range" min="1" max="20" step="1"></div>
+        <div class="slider"><label for="tol">Tolerancia del guano <output id="oTol"></output></label><input id="tol" type="range" min="4" max="60" step="1"></div>
+        <div class="row">
+          <button class="btn ghost" id="undoSample" type="button">Deshacer</button>
+          <button class="btn ghost" id="clearSamples" type="button">Borrar muestras</button>
+        </div>
+      </div>
+
+      <label class="check" id="roiRow" hidden><input id="roiOn" type="checkbox"> <span id="roiLbl">Analizar sólo la zona de interés</span></label>
+      <h3>Limpieza de la máscara</h3>
+      <div class="slider"><label for="open">Quitar puntos sueltos <output id="oOpen"></output></label><input id="open" type="range" min="0" max="4" step="1"></div>
+      <div class="slider"><label for="close">Cerrar huecos <output id="oClose"></output></label><input id="close" type="range" min="0" max="6" step="1"></div>
+      <div class="field"><label for="minArea" id="minAreaLbl">Superficie mínima de un grupo (m²)</label><input id="minArea" type="number" min="0" step="any" inputmode="decimal"></div>
+    </section>
+
+    <section class="block">
+      <h2><span class="step">5</span>De superficie a parejas</h2>
+      <div class="field">
+        <label for="species">Densidad de nidos</label>
+        <select id="species">
+          <option value="adelia">Adelia: 0,63 ± 0,3 parejas/m² (Mawson)</option>
+          <option value="custom">Valor propio o calibrado</option>
+        </select>
+      </div>
+      <div class="bands three">
+        <div class="field"><label for="dLo">Mínima</label><input id="dLo" type="number" min="0" step="any" inputmode="decimal"></div>
+        <div class="field"><label for="dMid">Central</label><input id="dMid" type="number" min="0" step="any" inputmode="decimal"></div>
+        <div class="field"><label for="dHi">Máxima</label><input id="dHi" type="number" min="0" step="any" inputmode="decimal"></div>
+      </div>
+      <div class="field">
+        <label for="known">Calibrar con un censo de terreno (parejas contadas)</label>
+        <div class="row tight">
+          <input id="known" type="number" min="0" step="1" inputmode="numeric" placeholder="por ejemplo 5383">
+          <button class="btn" id="calib" type="button">Calibrar</button>
+        </div>
+        <p class="hint">Divide las parejas contadas por la superficie detectada y usa ese cociente como densidad propia del sitio. No hay un valor publicado de uso general para el papúa: conviene calibrar.</p>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2><span class="step">6</span>Individuos</h2>
+      <label class="check"><input id="indOn" type="checkbox"> Contar individuos como manchas oscuras</label>
+      <p class="hint" id="indNote"></p>
+      <div id="indBox" hidden>
+        <div class="slider"><label for="indDiam">Tamaño del ave vista desde arriba <output id="oDiam"></output></label><input id="indDiam" type="range" min="0.15" max="0.8" step="0.01"></div>
+        <div class="slider"><label for="indK">Exigencia de contraste <output id="oK"></output></label><input id="indK" type="range" min="2" max="12" step="0.5"></div>
+        <label class="check"><input id="indGuano" type="checkbox" checked> Sólo sobre el guano detectado y a un metro de su borde</label>
+      </div>
+    </section>
+
+  </aside>
+
+  <section class="stage" aria-label="Visor">
+    <div class="toolbar">
+      <div class="seg small" role="group" aria-label="Herramienta">
+        <button id="toolPan" aria-pressed="true" type="button">Mover</button>
+        <button id="toolSample" aria-pressed="false" type="button">Muestrear</button>
+      </div>
+      <div class="field inline"><label for="mode">Vista</label>
+        <select id="mode">
+          <option value="rgb">Color</option>
+          <option value="cir">Falso color infrarrojo</option>
+          <option value="ri">Enrojecimiento</option>
+          <option value="ax">Tinte rosado</option>
+          <option value="ndvi">NDVI</option>
+          <option value="elev">Elevación</option>
+          <option value="slope">Pendiente</option>
+          <option value="shade">Sombreado del relieve</option>
+        </select>
+      </div>
+      <div class="slider inline"><label for="gamma">Realce</label><input id="gamma" type="range" min="0.3" max="1.6" step="0.02"></div>
+      <div class="ovgroup">
+        <label class="check inline"><input id="ovOn" type="checkbox" checked> Detección</label>
+        <div class="slider inline"><label for="ovA" class="visually-hidden">Opacidad de la detección</label><input id="ovA" type="range" min="0" max="1" step="0.02"></div>
+      </div>
+      <div class="zoom">
+        <button class="btn icon" id="zOut" type="button" aria-label="Alejar">−</button>
+        <button class="btn icon" id="zFit" type="button" aria-label="Ajustar a la ventana">Ajustar</button>
+        <button class="btn icon" id="zIn" type="button" aria-label="Acercar">+</button>
+      </div>
+    </div>
+    <div class="viewport" id="viewport">
+      <canvas id="view" tabindex="0" aria-label="Imagen con la detección superpuesta"></canvas>
+      <div class="busy" id="busy" hidden><span id="busyTxt">Procesando…</span></div>
+      <div class="drop" id="drop" hidden>Soltar la imagen aquí</div>
+      <div class="scalebar" id="scalebar" hidden><span id="scaleTxt"></span><i id="scaleLine"></i></div>
+    </div>
+    <p class="readout" id="readout">Pasar el cursor sobre la imagen para leer los valores de cada píxel.</p>
+  </section>
+
+  <aside class="panel results" aria-label="Resultados">
+    <section class="block">
+      <h2>Resultado</h2>
+      <p class="pill" id="aptitude"></p>
+      <dl class="kpi">
+        <div><dt>Superficie con guano</dt><dd id="kArea">—</dd><dd class="sub" id="kAreaSub"></dd></div>
+        <div><dt>Grupos detectados</dt><dd id="kGroups">—</dd><dd class="sub" id="kGroupsSub"></dd></div>
+        <div class="accent"><dt>Parejas estimadas</dt><dd id="kPairs">—</dd><dd class="sub" id="kPairsSub"></dd></div>
+        <div id="kIndWrap" hidden><dt>Individuos contados</dt><dd id="kInd">—</dd><dd class="sub" id="kIndSub"></dd></div>
+      </dl>
+      <p class="truth" id="truth" hidden></p>
+      <p class="warn" id="warn" hidden></p>
+    </section>
+
+    <section class="block">
+      <h2>Grupos</h2>
+      <div class="tablewrap">
+        <table id="tbl">
+          <thead><tr><th>N.º</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="hint" id="tblNote"></p>
+    </section>
+
+    <section class="block">
+      <h2>Exportar</h2>
+      <div class="col">
+        <button class="btn" id="exCsv" type="button">Tabla de grupos (CSV)</button>
+        <button class="btn" id="exGeo" type="button">Polígonos de los grupos (GeoJSON)</button>
+        <button class="btn" id="exInd" type="button" hidden>Posición de los individuos (CSV)</button>
+        <button class="btn" id="exPng" type="button">Mapa con la detección (PNG)</button>
+      </div>
+      <p class="hint" id="exNote">Con una imagen georreferenciada, los polígonos salen en longitud y latitud WGS 84 y se abren en QGIS.</p>
+    </section>
+  </aside>
+
+</main>
+
+<section class="band" id="tiempo">
+  <header class="bandhead">
+    <h2>Seguimiento por temporadas</h2>
+    <p class="lede">Conteos publicados de 70 colonias del sector, <span id="spanYears">desde 1965/66</span>, y las detecciones propias que se vayan guardando. Elegir una colonia en el mapa para ver su serie.</p>
+  </header>
+  <div class="bandgrid">
+    <div class="col">
+      <div class="mapwrap"><canvas id="regMap" aria-label="Mapa de colonias de la Isla 25 de Mayo y vecinas"></canvas></div>
+      <p class="hint">Costa simplificada de Natural Earth a escala 1:10 millones: sirve de ubicación, no de cartografía. El tamaño del círculo crece con el último conteo; el color indica la especie más numerosa.</p>
+      <div class="siteinfo" id="siteInfo"></div>
+    </div>
+    <div class="col">
+      <div class="chartwrap"><canvas id="serie" aria-label="Serie de conteos por temporada"></canvas><div class="tip" id="tip" hidden></div></div>
+      <div class="legend" id="legend"></div>
+      <h3>El ciclo reproductivo y la señal en la imagen</h3>
+      <div class="phenowrap"><table class="pheno" id="pheno"></table></div>
+      <p class="hint">Calendario aproximado para Punta Stranger. En temporadas de mucha nieve la eclosión del papúa se corrió unas cinco semanas. Comparar entre temporadas sólo imágenes de la misma fase.</p>
+    </div>
+  </div>
+  <div class="bandgrid">
+    <div class="block">
+      <h3 class="first">Guardar la detección actual en la serie</h3>
+      <div class="bands">
+        <div class="field"><label for="recDate">Fecha de la imagen</label><input id="recDate" type="date" min="1956-01-01" max="2030-12-31"></div>
+        <div class="field"><label for="recLabel">Sensor o nota</label><input id="recLabel" type="text" maxlength="60" placeholder="por ejemplo Sentinel-2"></div>
+      </div>
+      <button class="btn primary" id="recAdd" type="button">Agregar a la serie de la colonia elegida</button>
+      <p class="hint" id="recHint"></p>
+      <h3>Qué cambió entre dos fechas</h3>
+      <div class="bands">
+        <div class="field"><label for="cmpA">Fecha anterior</label><select id="cmpA"></select></div>
+        <div class="field"><label for="cmpB">Fecha posterior</label><select id="cmpB"></select></div>
+      </div>
+      <button class="btn" id="cmpRun" type="button">Calcular el mapa de cambios</button>
+      <p class="hint" id="cmpTxt">Hacen falta dos detecciones guardadas del mismo lugar: georreferenciadas o con el mismo encuadre.</p>
+      <div class="cmpwrap" id="cmpWrap" hidden><canvas id="cmpMap" aria-label="Mapa de cambios entre las dos fechas"></canvas>
+        <p class="keys"><span><i class="k1"></i>Se mantiene</span><span><i class="k2"></i>Aparece</span><span><i class="k3"></i>Desaparece</span></p></div>
+    </div>
+    <div class="block">
+      <h3 class="first">Detecciones guardadas</h3>
+      <div class="tablewrap tall"><table id="recs"><thead><tr><th>Fecha</th><th>Temporada</th><th>Fase: Adelia · papúa</th><th>Señal</th><th>Píxel</th><th>Superficie</th><th>Parejas</th><th></th></tr></thead><tbody></tbody></table></div>
+      <p class="hint" id="recsNote"></p>
+      <div class="row">
+        <button class="btn" id="serCsv" type="button">Serie (CSV)</button>
+        <button class="btn" id="serJson" type="button">Serie completa con máscaras (JSON)</button>
+        <label class="btn" for="serImport">Importar serie</label>
+        <input id="serImport" type="file" accept=".json,application/json" class="visually-hidden">
+      </div>
+      <p class="hint">La serie se recuerda en este navegador. Para conservarla o pasarla a otra computadora, exportarla en JSON.</p>
+    </div>
+  </div>
+</section>
+
+<section class="notes">
+
+  <article>
+    <h2>Qué se ve desde el espacio y qué no</h2>
+    <p>Un pingüino pigoscélido adulto mide entre 70 y 90 cm de alto y, visto desde arriba, ocupa unas pocas decenas de centímetros. Los mejores satélites comerciales entregan píxeles de unos 30 cm, de modo que un ave es, como mucho, un píxel mezclado con el suelo. Por eso la literatura no cuenta aves en las imágenes satelitales: detecta la mancha de guano que deja la colonia y convierte su superficie en parejas reproductoras.</p>
+    <table class="scale">
+      <thead><tr><th>Píxel</th><th>Sensores típicos</th><th>Qué permite</th></tr></thead>
+      <tbody>
+        <tr><td>2 a 10 cm</td><td>Dron, foto aérea</td><td>Contar nidos e individuos</td></tr>
+        <tr><td>0,3 a 0,6 m</td><td>WorldView, Pléiades Neo</td><td>Delinear cada grupo reproductivo y medir su superficie</td></tr>
+        <tr><td>3 m</td><td>PlanetScope</td><td>Ver la colonia; los grupos chicos se funden</td></tr>
+        <tr><td>10 m</td><td>Sentinel-2</td><td>Manchas de varias decenas de metros; seguimiento entre años</td></tr>
+        <tr><td>30 m</td><td>Landsat</td><td>Presencia de colonias grandes; serie histórica larga</td></tr>
+      </tbody>
+    </table>
+    <p>El conteo de individuos de esta herramienta queda habilitado sólo con píxeles de hasta 15 cm. En la ZAEP 132 los drones requieren autorización caso por caso y el sobrevuelo por debajo de 610 m está restringido, lo que vuelve a la imagen satelital la única mirada que no entra a la colonia.</p>
+  </article>
+
+  <article>
+    <h2>Las colonias junto a la base</h2>
+    <p>Las pingüineras están en Punta Stranger (Cabo Funes), sobre la costa sur de la Península Potter, dentro de la Zona Antártica Especialmente Protegida N.º 132 y a unos kilómetros de la Base Carlini. El Instituto Antártico Argentino las censa en terreno desde 1995/96.</p>
+    <ul class="facts">
+      <li><b>Papúa en alza.</b> 5.383 parejas y 5.545 pichones en 2018/19, con tendencia creciente desde mediados de los noventa.</li>
+      <li><b>Adelia en retroceso.</b> 14.554 parejas en 1988/89; alrededor de 3.000 según el plan de gestión de 2018. De 50 grupos reproductivos en 1995 quedaban 20 a los diecinueve años.</li>
+      <li><b>Lo que confunde.</b> En las mismas playas hay unos 400 elefantes marinos hembra en temporada, lobos marinos, tapices de musgo y líquenes. Los revolcaderos de barro y los líquenes anaranjados se parecen al guano en una imagen de color.</li>
+    </ul>
+    <p>La ventana más usada es diciembre y enero, cuando se hacen los censos de incubación: antes el guano todavía no viró al rosado, y después de la guardería la mancha se lava y sus bordes se desdibujan. Comparar siempre fechas equivalentes de la temporada.</p>
+  </article>
+
+  <article>
+    <h2>Cómo decide la herramienta</h2>
+    <ol class="method">
+      <li><b>Regla espectral.</b> Tres cocientes entre bandas: enrojecimiento (rojo − azul)/(rojo + azul); tinte rosado, que mide cuánto se hunde el verde respecto del promedio de rojo y azul, la huella de la astaxantina del krill cerca de 550 nm; y brillo. Con infrarrojo se descartan vegetación (NDVI), agua (NDWI) y nieve (NDSI).</li>
+      <li><b>Con muestras.</b> Clasificación supervisada por máxima verosimilitud, uno de los procedimientos de los censos satelitales publicados: cada clase se describe con la media y la covarianza de sus bandas y cada píxel va a la clase más probable.</li>
+      <li><b>Grupos.</b> La máscara se limpia, se separa en manchas contiguas y se descartan las menores que el umbral de superficie.</li>
+      <li><b>Parejas.</b> Superficie por densidad de nidos. El valor de partida es el de las colonias de Adelia de Mawson, 0,63 ± 0,3 parejas/m², con extremos medidos de 0,1 a 3,1.</li>
+    </ol>
+    <p>Con un GeoTIFF en proyección estereográfica polar (EPSG:3031) la superficie se corrige por la escala de la proyección, que a 62° S exagera las distancias un 3,2 %.</p>
+  </article>
+
+  <article>
+    <h2>Imágenes públicas donde se ven individuos</h2>
+    <p>Desde el espacio no hay imágenes libres con ese detalle: lo abierto llega a 10 m (Sentinel-2) y las de 30 a 50 cm son comerciales. Lo que sí es público son ortomosaicos de dron, de 1,5 a 6 cm por píxel:</p>
+    <ul class="facts">
+      <li><b>Península Potter, ZAEP 132.</b> <a href="https://doi.org/10.6084/m9.figshare.29561684">Ortomosaicos polacos de 2019 a 2024</a>, con la península relevada al menos en 2022 a entre 1,5 y 2,2 cm por píxel, en UTM 21S. Se volaron para elefantes marinos entre septiembre y diciembre: cubren a los pingüinos sólo en parte, pero el del 14 de octubre de 2022 muestra agrupaciones tempranas de papúa.</li>
+      <li><b>Isla Ardley</b>, junto a la península Fildes: <a href="https://doi.org/10.5281/zenodo.14503437">imágenes y ortomosaicos</a> con Adelia, barbijo y papúa.</li>
+      <li><b>False Round Point</b>, costa norte de la isla: <a href="https://doi.org/10.25921/h3q1-1x73">ortomosaico de 5,6 cm</a> con 19.886 nidos de barbijo contados.</li>
+      <li><b>Fuera del sector:</b> <a href="https://www.usap-dc.org/dataset_search?free_text=Biota">colonias de la isla Ross</a>, <a href="https://doi.org/10.5285/28222725-c53d-40f4-9350-49c368899f0b">Sandwich del Sur</a> con coordenadas de nidos, y <a href="https://zenodo.org/record/6714100">cabo Shirreff</a> con anotaciones para entrenar detectores.</li>
+    </ul>
+    <p>Cargados en esta herramienta, esos GeoTIFF habilitan el conteo de individuos. Ninguno es un censo completo de Punta Stranger.</p>
+  </article>
+
+  <article>
+    <h2>El relieve y el resto del análisis espacial</h2>
+    <p>Con un modelo de elevación sobre la imagen, cada grupo recibe cota, pendiente media, orientación y superficie medida sobre la ladera. La pendiente importa por dos razones: la densidad aparente de nidos cambia con ella, y permite descartar laderas donde no se anida. En el hemisferio sur las caras que miran al norte reciben más sol y suelen despejarse antes de nieve.</p>
+    <p>Además se calcula la distancia de cada grupo al mar, a partir del agua detectada por infrarrojo o de la cota cero, y la distancia al grupo vecino más cercano. Modelos de elevación libres: Copernicus DEM de 30 m y REMA, de 2 a 32 m.</p>
+  </article>
+
+  <article class="open">
+    <h2>Preguntas que la imagen no responde</h2>
+    <ul class="questions">
+      <li><b>¿La mancha mide pingüinos o memoria?</b> El guano persiste y los grupos abandonados dejan suelo ornitogénico. En un sitio donde el Adelia perdió más de la mitad de sus grupos, la imagen puede leer el pasado de la colonia como presente.</li>
+      <li><b>Dos especies, una sola firma.</b> El espectro del guano no distingue especies de manera confiable; sólo a comienzos de temporada se logró separar Adelia de papúa por el color. En Punta Stranger el papúa crece mientras el Adelia cae: la superficie total puede mantenerse mientras la composición se invierte. El satélite puede ocultar justo el cambio que importa.</li>
+      <li><b>La densidad no es una constante.</b> Cambia con la pendiente, con la fecha y con el sitio. Calibrar con el censo de terreno convierte a la herramienta de estimador en detector de cambios, que es lo que puede sostener con honestidad.</li>
+      <li><b>Las reglas no viajan.</b> Los umbrales afinados en una escena fallan en otra con distinto sol, sensor o humedad. Todo resultado necesita una revisión visual, y la verdad de campo sigue exigiendo presencia.</li>
+    </ul>
+  </article>
+
+  <article class="wide">
+    <h2>Fuentes</h2>
+    <ul class="sources">
+      <li><a href="https://doi.org/10.1007/s00300-019-02614-0">Juáres et al. 2020</a>, Polar Biology: población de papúa en Punta Stranger.</li>
+      <li><a href="https://doi.org/10.1017/s0954102015000152">Juáres et al. 2015</a>, Antarctic Science: diecinueve años de Adelia en Punta Stranger.</li>
+      <li><a href="https://doi.org/10.1007/s00300-009-0637-y">Carlini et al. 2009</a>, Polar Biology: tendencias opuestas de Adelia y papúa.</li>
+      <li><a href="https://www.env.go.jp/nature/nankyoku/kankyohogo/database/jyouyaku/aspa/aspa_pdf_en/132.pdf">Plan de gestión de la ZAEP 132</a>, Medida 3 (2018).</li>
+      <li><a href="https://doi.org/10.1007/s00300-014-1451-8">LaRue et al. 2014</a>, Polar Biology: de superficie de guano a parejas con imágenes de 0,6 m.</li>
+      <li><a href="https://doi.org/10.1642/AUK-14-31.1">Lynch y LaRue 2014</a>, The Auk: primer censo global del Adelia.</li>
+      <li><a href="https://nora.nerc.ac.uk/id/eprint/517895/">Rees et al. 2017</a>, Antarctic Science: el color del guano y la astaxantina.</li>
+      <li><a href="https://nora.nerc.ac.uk/506751/1/Fretwell%20et%20al%20-%20Spectral%20signature%20of%20guano.pdf">Fretwell et al. 2015</a>, Remote Sensing of Environment: firma espectral del guano en Landsat.</li>
+      <li><a href="https://doi.org/10.3390/rs8050375">Witharana y Lynch 2016</a>, Remote Sensing: reglas por objetos y su transferencia entre sitios.</li>
+      <li><a href="https://doi.org/10.1080/15481603.2022.2101702">Román et al. 2022</a>, GIScience &amp; Remote Sensing: dron, Sentinel-2 y Landsat en Isla Decepción.</li>
+      <li><a href="https://www.umweltbundesamt.de/sites/default/files/medien/1410/publikationen/2017-04-06_texte_30-2017_pinguinmonitoring_eng_0.pdf">Mustafa et al. 2017</a>, Umweltbundesamt: variación del guano y de la densidad a lo largo de la temporada.</li>
+      <li><a href="https://data.aad.gov.au/metadata/records/ASAC_1219_AAT_APen_M_Area">Woehler 1999</a>, Australian Antarctic Data Centre: superficie y densidad en colonias de Adelia.</li>
+      <li><a href="https://github.com/CCheCastaldo/mapppdr">MAPPPD, Antarctic Penguin Biogeography Project</a> (mapppdr 3.1, CC BY 4.0): censos de las 70 colonias del sector.</li>
+      <li><a href="https://polarresearch.net/index.php/polar/article/download/3113/html?inline=1">Juáres et al. 2013</a>, Polar Research: cronología reproductiva del papúa en Punta Stranger.</li>
+      <li><a href="https://sora.unm.edu/sites/default/files/journals/auk/v096n04/p0675-p0681.pdf">Trivelpiece y Volkman 1979</a>, The Auk: arribo y puesta del Adelia en Point Thomas.</li>
+      <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12717269">Ortomosaicos de la Isla 25 de Mayo 2019–2024</a>, Scientific Data: incluye la ZAEP 132.</li>
+      <li><a href="https://www.naturalearthdata.com/">Natural Earth</a>: línea de costa del mapa de ubicación.</li>
+    </ul>
+    <p class="hint">Imágenes libres: <a href="https://browser.dataspace.copernicus.eu/">Copernicus Browser</a> (Sentinel-2) y <a href="https://earthexplorer.usgs.gov/">USGS EarthExplorer</a> (Landsat). Para muy alta resolución hacen falta imágenes comerciales o convenios institucionales.</p>
+  </article>
+
+</section>
+
+<div class="modal" id="modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h2 id="modalTitle">Copiar</h2>
+    <p class="hint" id="modalHint"></p>
+    <textarea id="modalText" readonly rows="12" aria-label="Contenido para copiar"></textarea>
+    <div class="row">
+      <button class="btn primary" id="modalCopy" type="button">Copiar</button>
+      <button class="btn" id="modalClose" type="button">Cerrar</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>window.PC_WEB = true;</script>
+<script src="data.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+<script src="tiempo.js"></script>
+<script src="sentinel.js"></script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+{
+ "titulo": "Península Potter, Sentinel-2 L2A",
+ "fuente": "Copernicus Sentinel-2 L2A (ESA), leído de Earth Search (Element 84) en AWS",
+ "escenas": [
+  {
+   "archivo": "datos/potter_s2_20191120.tif",
+   "fecha": "2019-11-20",
+   "nubes": 0.073,
+   "zonaVisible": 0.54
+  },
+  {
+   "archivo": "datos/potter_s2_20200119.tif",
+   "fecha": "2020-01-19",
+   "nubes": 0.002,
+   "zonaVisible": 0.91
+  },
+  {
+   "archivo": "datos/potter_s2_20210212.tif",
+   "fecha": "2021-02-12",
+   "nubes": 0.148,
+   "zonaVisible": 0.71
+  },
+  {
+   "archivo": "datos/potter_s2_20211122.tif",
+   "fecha": "2021-11-22",
+   "nubes": 0.06,
+   "zonaVisible": 0.34
+  },
+  {
+   "archivo": "datos/potter_s2_20211229.tif",
+   "fecha": "2021-12-29",
+   "nubes": 0.003,
+   "zonaVisible": 0.93
+  },
+  {
+   "archivo": "datos/potter_s2_20221211.tif",
+   "fecha": "2022-12-11",
+   "nubes": 0.645,
+   "zonaVisible": 0
+  },
+  {
+   "archivo": "datos/potter_s2_20230110.tif",
+   "fecha": "2023-01-10",
+   "nubes": 0.601,
+   "zonaVisible": 0
+  },
+  {
+   "archivo": "datos/potter_s2_20231106.tif",
+   "fecha": "2023-11-06",
+   "nubes": 0.148,
+   "zonaVisible": 0.07
+  },
+  {
+   "archivo": "datos/potter_s2_20231206.tif",
+   "fecha": "2023-12-06",
+   "nubes": 0,
+   "zonaVisible": 0.23
+  },
+  {
+   "archivo": "datos/potter_s2_20241110.tif",
+   "fecha": "2024-11-10",
+   "nubes": 0,
+   "zonaVisible": 0.06
+  },
+  {
+   "archivo": "datos/potter_s2_20241206.tif",
+   "fecha": "2024-12-06",
+   "nubes": 0.023,
+   "zonaVisible": 0.51
+  },
+  {
+   "archivo": "datos/potter_s2_20251121.tif",
+   "fecha": "2025-11-21",
+   "nubes": 0.114,
+   "zonaVisible": 0.03
+  },
+  {
+   "archivo": "datos/potter_s2_20251208.tif",
+   "fecha": "2025-12-08",
+   "nubes": 0.063,
+   "zonaVisible": 0.34
+  }
+ ],
+ "porDefecto": "datos/potter_s2_20211229.tif",
+ "relieve": {
+  "archivo": "datos/relieve_cop30.tif",
+  "nombre": "Copernicus DEM GLO-30, celda de 30 m"
+ },
+ "regla": {
+  "rel": true,
+  "kri": 3.5,
+  "kax": 2,
+  "lmin": 0.05,
+  "lmax": 0.32,
+  "ndvi": 0.3,
+  "ndwi": 0.1,
+  "ndsi": 0.7
+ },
+ "limpieza": {
+  "abrir": 0,
+  "cerrar": 1,
+  "minimo": 300
+ },
+ "zona": {
+  "nombre": "el entorno de Punta Stranger",
+  "x0": 415100,
+  "x1": 416500,
+  "y0": 3095450,
+  "y1": 3096650
+ }
+}
