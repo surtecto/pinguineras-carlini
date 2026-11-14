@@ -158,6 +158,22 @@
     return mask;
   };
 
+  /* suelo desnudo: ni agua, ni nieve, ni vegetación, ni sombra o brillo extremos (los mismos filtros de la regla, sin el color) */
+  PE.groundMask = function (s, p) {
+    var N = s.w * s.h, m = s.map, inv = 1 / s.ref, mask = new Uint8Array(N);
+    var R = s.bands[m.r], G = s.bands[m.g], B = s.bands[m.b];
+    var NIR = m.nir >= 0 ? s.bands[m.nir] : null, SW = m.swir >= 0 ? s.bands[m.swir] : null, V = s.valid;
+    for (var i = 0; i < N; i++) {
+      if (V && !V[i]) continue;
+      var r = R[i] * inv, g = G[i] * inv, b = B[i] * inv, L = (r + g + b) / 3;
+      if (L < p.lmin || L > p.lmax) continue;
+      if (NIR) { var n = NIR[i] * inv; if ((n - r) / (n + r + EPS) > p.ndvi) continue; if ((g - n) / (g + n + EPS) > p.ndwi) continue; }
+      if (SW) { var w = SW[i] * inv; if ((g - w) / (g + w + EPS) > p.ndsi) continue; }
+      mask[i] = 1;
+    }
+    return mask;
+  };
+
   /* ---------- clasificación supervisada: máxima verosimilitud gaussiana ---------- */
   PE.featureBands = function (s) {
     var m = s.map, idx = [];

@@ -8,320 +8,356 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="app">
 
-<header class="top">
+<header class="bar">
   <div class="brand">
-    <p class="eyebrow">Isla 25 de Mayo · Shetland del Sur · ZAEP N.º 132</p>
     <h1>Pingüineras de Carlini</h1>
-    <p class="lede">Detecta colonias de pingüinos por la mancha de guano en imágenes satelitales y aéreas, mide su superficie y estima parejas reproductoras.</p>
+    <p class="where">Punta Stranger · ZAEP N.º 132 · Isla 25 de Mayo</p>
   </div>
-  <nav class="toplinks"><a href="manual.html">Manual de uso</a><a href="https://github.com/surtecto/pinguineras-carlini">Código y datos</a></nav>
-  <dl class="fix">
-    <div><dt>Base Carlini</dt><dd>62°14′ S&ensp;58°40′ O</dd></div>
-    <div><dt>Punta Stranger</dt><dd>62°16′ S&ensp;58°37′ O</dd></div>
-    <div><dt>Papúa 2018/19</dt><dd>5.383 parejas</dd></div>
-  </dl>
+  <nav class="tabs" id="mainTabs" role="tablist" aria-label="Secciones">
+    <button role="tab" type="button" data-view="detectar" aria-selected="true">Detectar</button>
+    <button role="tab" type="button" data-view="censos" aria-selected="false">Colonias y censos</button>
+    <button role="tab" type="button" data-view="serie" aria-selected="false">Mi serie</button>
+    <button role="tab" type="button" data-view="ayuda" aria-selected="false">Cómo funciona</button>
+  </nav>
+  <nav class="barlinks"><a href="manual.html">Manual</a><a href="https://github.com/surtecto/pinguineras-carlini">Código y datos</a></nav>
 </header>
 
-<main class="work">
+<main class="views">
 
-  <aside class="panel controls" aria-label="Controles">
-
-    <section class="block">
-      <h2><span class="step">1</span>Imagen</h2>
-      <div id="s2box" class="col">
-        <div class="field">
-          <label for="s2cat">Escenas Sentinel-2 reales de la Península Potter</label>
-          <select id="s2cat"></select>
+  <!-- ===================== DETECTAR ===================== -->
+  <section class="view" id="v-detectar">
+    <div class="stage" aria-label="Visor">
+      <div class="status" id="status">
+        <p class="sum" id="sumBar">Cargando la imagen…</p>
+        <p class="diag" id="diag"></p>
+      </div>
+      <div class="viewport" id="viewport">
+        <canvas id="view" tabindex="0" aria-label="Imagen con la detección superpuesta"></canvas>
+        <div class="hintbar" id="hintbar" hidden></div>
+        <div class="busy" id="busy" hidden><span id="busyTxt">Procesando…</span></div>
+        <div class="drop" id="drop" hidden>Soltar la imagen aquí</div>
+        <div class="scalebar" id="scalebar" hidden><span id="scaleTxt"></span><i id="scaleLine"></i></div>
+        <div class="zoom">
+          <button class="btn icon" id="zIn" type="button" aria-label="Acercar">+</button>
+          <button class="btn icon" id="zOut" type="button" aria-label="Alejar">−</button>
+          <button class="btn icon" id="zFit" type="button" aria-label="Ver la imagen completa">Todo</button>
+          <button class="btn icon" id="zZone" type="button" aria-label="Ir a la zona de la colonia">Colonia</button>
         </div>
-        <details class="live">
-          <summary>Buscar otras fechas y sectores en el archivo Sentinel-2</summary>
+      </div>
+      <div class="toolbar">
+        <div class="field inline"><label for="mode">Ver como</label>
+          <select id="mode">
+            <option value="rgb">Color</option>
+            <option value="cir">Falso color infrarrojo</option>
+            <option value="ri">Enrojecimiento</option>
+            <option value="ax">Tinte rosado</option>
+            <option value="ndvi">NDVI</option>
+            <option value="elev">Elevación</option>
+            <option value="slope">Pendiente</option>
+            <option value="shade">Sombreado del relieve</option>
+          </select>
+        </div>
+        <div class="slider inline"><label for="gamma">Brillo</label><input id="gamma" type="range" min="0.3" max="1.6" step="0.02"></div>
+        <div class="ovgroup">
+          <label class="check inline"><input id="ovOn" type="checkbox" checked> Mostrar lo detectado</label>
+          <div class="slider inline"><label for="ovA" class="visually-hidden">Opacidad de la detección</label><input id="ovA" type="range" min="0" max="1" step="0.02"></div>
+        </div>
+        <p class="readout" id="readout">Arrastrar mueve la imagen; la rueda acerca.</p>
+      </div>
+      <span hidden><button id="toolPan" type="button"></button><button id="toolSample" type="button"></button></span>
+    </div>
+
+    <aside class="side" aria-label="Panel de trabajo">
+      <nav class="subtabs" id="subTabs" role="tablist" aria-label="Pasos">
+        <button role="tab" type="button" data-pane="imagen" aria-selected="true"><b>1</b>Imagen</button>
+        <button role="tab" type="button" data-pane="deteccion" aria-selected="false"><b>2</b>Detección</button>
+        <button role="tab" type="button" data-pane="resultado" aria-selected="false"><b>3</b>Resultado</button>
+        <button role="tab" type="button" data-pane="ajustes" aria-selected="false">Ajustes</button>
+      </nav>
+
+      <div class="pane" id="p-imagen">
+        <div id="s2box" class="col">
+          <div class="field">
+            <label for="s2cat">Imágenes satelitales reales de la Península Potter</label>
+            <select id="s2cat"></select>
+          </div>
+          <p class="hint">Sentinel-2, píxel de 10 m. Las marcadas «colonia visible» son las que sirven; en las demás la nieve o las nubes tapan la zona.</p>
+        </div>
+        <p class="hint scene" id="sceneNote"></p>
+        <label class="btn primary" for="file">Cargar una imagen propia</label>
+        <input id="file" type="file" accept=".tif,.tiff,.png,.jpg,.jpeg,.webp,image/tiff,image/png,image/jpeg,image/webp" class="visually-hidden">
+        <p class="hint">GeoTIFF, PNG o JPG. También se puede soltar el archivo sobre la imagen. No sale de este navegador.</p>
+        <details class="live" id="s2live">
+          <summary>Buscar otra fecha u otro sector en el archivo satelital</summary>
           <div class="col">
             <div class="field"><label for="s2sector">Sector</label><select id="s2sector"></select></div>
             <div class="field"><label for="s2season">Temporada</label><select id="s2season"></select></div>
-            <button class="btn" id="s2go" type="button">Buscar escenas</button>
+            <button class="btn" id="s2go" type="button">Buscar</button>
             <div class="col" id="s2res" aria-live="polite"></div>
-            <p class="hint">Lee en vivo el archivo abierto de Copernicus en la nube: sólo baja el recorte del sector, unos pocos megabytes por escena.</p>
+            <p class="hint">Lee en vivo el archivo abierto de Copernicus y baja sólo el recorte. Puede tardar uno o dos minutos por imagen.</p>
+          </div>
+        </details>
+        <details class="live">
+          <summary>Imágenes inventadas para practicar</summary>
+          <div class="col">
+            <div class="row">
+              <button class="btn ghost" id="demoSat" type="button">Satelital</button>
+              <button class="btn ghost" id="demoSat2" type="button">La misma, años después</button>
+              <button class="btn ghost" id="demoDrone" type="button">De dron</button>
+            </div>
+            <p class="hint">Traen la respuesta correcta, así que la app dice cuánto acertó.</p>
           </div>
         </details>
       </div>
-      <label class="btn primary" for="file">Cargar una imagen propia</label>
-      <input id="file" type="file" accept=".tif,.tiff,.png,.jpg,.jpeg,.webp,image/tiff,image/png,image/jpeg,image/webp" class="visually-hidden">
-      <p class="hint">GeoTIFF (con bandas y georreferencia), PNG o JPG. También se puede soltar el archivo sobre el visor. La imagen no sale de este navegador.</p>
-      <div class="field">
-        <label for="maxpx">Detalle del análisis</label>
-        <select id="maxpx">
-          <option value="4">Estándar: hasta 4 megapíxeles</option>
-          <option value="9">Sector amplio o mucho detalle: hasta 9 megapíxeles</option>
-        </select>
-      </div>
-      <div class="row">
-        <button class="btn ghost" id="demoSat" type="button">Ejemplo sintético</button>
-        <button class="btn ghost" id="demoSat2" type="button">Sintético posterior</button>
-        <button class="btn ghost" id="demoDrone" type="button">Dron sintético</button>
-      </div>
-      <p class="hint" id="sceneNote"></p>
-    </section>
 
-    <section class="block">
-      <h2><span class="step">2</span>Bandas y escala</h2>
-      <div class="field">
-        <label for="preset">Orden de bandas</label>
-        <select id="preset">
-          <option value="rgb">Rojo, verde, azul</option>
-          <option value="bgrn">Azul, verde, rojo, infrarrojo (PlanetScope, Sentinel-2 a 10 m)</option>
-          <option value="wv8">WorldView-2/3, 8 bandas</option>
-          <option value="l8">Landsat 8/9, bandas 1 a 7</option>
-          <option value="s2">Sentinel-2, bandas 1 a 12 apiladas</option>
-          <option value="custom">Elegir a mano</option>
-        </select>
-      </div>
-      <div class="bands" id="bandGrid">
-        <div class="field"><label for="bR">Rojo</label><select id="bR"></select></div>
-        <div class="field"><label for="bG">Verde</label><select id="bG"></select></div>
-        <div class="field"><label for="bB">Azul</label><select id="bB"></select></div>
-        <div class="field"><label for="bN">Infrarrojo cercano</label><select id="bN"></select></div>
-        <div class="field"><label for="bS">Infrarrojo medio</label><select id="bS"></select></div>
-      </div>
-      <div class="field">
-        <label for="gsd">Tamaño de píxel de la imagen original (m)</label>
-        <div class="row tight">
-          <input id="gsd" type="number" min="0" step="any" inputmode="decimal" placeholder="por ejemplo 0,5">
-          <button class="btn" id="toolMeasure" type="button" aria-pressed="false">Medir</button>
+      <div class="pane" id="p-deteccion" hidden>
+        <div class="seg" role="tablist" aria-label="Forma de detectar">
+          <button role="tab" id="mRule" aria-selected="true" type="button">Automática</button>
+          <button role="tab" id="mML" aria-selected="false" type="button">Con ejemplos</button>
         </div>
-        <p class="hint" id="gsdNote"></p>
-      </div>
-      <div class="measure" id="measureBox" hidden>
-        <p class="hint" id="measureTxt"></p>
-        <div class="row tight">
-          <input id="measureM" type="number" min="0" step="any" inputmode="decimal" placeholder="distancia real (m)" aria-label="Distancia real entre los dos puntos, en metros">
-          <button class="btn" id="measureApply" type="button">Aplicar</button>
+
+        <div id="ruleBox" class="col">
+          <p class="hint">La app busca sola el color del guano: rojizo y rosado. No hay que marcar nada. Si pinta de más o de menos, mover estas dos perillas.</p>
+          <label class="check"><input id="pRel" type="checkbox"> Adaptar los umbrales a cada imagen (recomendado)</label>
+          <div class="slider" id="rowKri"><label for="pKri">Cuánto más rojo que el suelo común <output id="oKri"></output></label><input id="pKri" type="range" min="1" max="8" step="0.1"></div>
+          <div class="slider" id="rowKax"><label for="pKax">Cuánto más rosado que el suelo común <output id="oKax"></output></label><input id="pKax" type="range" min="0" max="6" step="0.1"></div>
+          <div class="slider" id="rowRi"><label for="pRi">Enrojecimiento mínimo <output id="oRi"></output></label><input id="pRi" type="range" min="0" max="0.5" step="0.005"></div>
+          <div class="slider" id="rowAx"><label for="pAx">Tinte rosado mínimo <output id="oAx"></output></label><input id="pAx" type="range" min="-0.08" max="0.12" step="0.002"></div>
+          <p class="hint" id="relNote"></p>
+          <details class="live">
+            <summary>Más umbrales</summary>
+            <div class="col">
+              <div class="slider"><label for="pLmin">Brillo mínimo <output id="oLmin"></output></label><input id="pLmin" type="range" min="0" max="0.6" step="0.01"></div>
+              <div class="slider"><label for="pLmax">Brillo máximo <output id="oLmax"></output></label><input id="pLmax" type="range" min="0.3" max="1.3" step="0.01"></div>
+              <div class="slider" id="rowNdvi"><label for="pNdvi">Vegetación: NDVI máximo <output id="oNdvi"></output></label><input id="pNdvi" type="range" min="-0.2" max="0.9" step="0.01"></div>
+              <div class="slider" id="rowNdwi"><label for="pNdwi">Agua: NDWI máximo <output id="oNdwi"></output></label><input id="pNdwi" type="range" min="-0.5" max="0.8" step="0.01"></div>
+              <div class="slider" id="rowNdsi"><label for="pNdsi">Nieve: NDSI máximo <output id="oNdsi"></output></label><input id="pNdsi" type="range" min="-0.2" max="0.9" step="0.01"></div>
+              <button class="btn ghost" id="ruleReset" type="button">Volver a los valores iniciales</button>
+            </div>
+          </details>
         </div>
-      </div>
-    </section>
 
-    <section class="block">
-      <h2><span class="step">3</span>Relieve</h2>
-      <label class="btn" for="demFile">Cargar modelo de elevación</label>
-      <input id="demFile" type="file" accept=".tif,.tiff,image/tiff" class="visually-hidden">
-      <p class="hint" id="demNote"></p>
-      <div id="demBox" hidden>
-        <label class="check"><input id="terrOn" type="checkbox"> Descartar lo que esté fuera de estos límites</label>
-        <div class="slider"><label for="tSlope">Pendiente máxima <output id="oTSlope"></output></label><input id="tSlope" type="range" min="5" max="60" step="1"></div>
-        <div class="slider"><label for="tElev">Cota máxima <output id="oTElev"></output></label><input id="tElev" type="range" min="5" max="400" step="5"></div>
-      </div>
-    </section>
+        <div id="mlBox" class="col" hidden>
+          <ol class="howto">
+            <li>Elegir <b>Esto es guano</b> y tocar una mancha rosada o rojiza de la imagen.</li>
+            <li>La app pinta de celeste todo lo que se le parece.</li>
+            <li>Si pintó de más, elegir <b>Esto no es guano</b> y tocar esas partes: nieve, roca, agua.</li>
+          </ol>
+          <div class="chips" id="chips" role="radiogroup" aria-label="Qué se está marcando"></div>
+          <div class="row">
+            <button class="btn ghost" id="undoSample" type="button">Deshacer el último toque</button>
+            <button class="btn ghost" id="clearSamples" type="button">Empezar de nuevo</button>
+          </div>
+          <details class="live">
+            <summary>Ajuste fino</summary>
+            <div class="col">
+              <div class="slider"><label for="brush">Tamaño de cada toque <output id="oBrush"></output></label><input id="brush" type="range" min="1" max="20" step="1"></div>
+              <div class="slider"><label for="tol">Cuánto puede alejarse del guano marcado <output id="oTol"></output></label><input id="tol" type="range" min="4" max="60" step="1"></div>
+            </div>
+          </details>
+        </div>
 
-    <section class="block">
-      <h2><span class="step">4</span>Detección del guano</h2>
-      <div class="seg" role="tablist" aria-label="Método de detección">
-        <button role="tab" id="mRule" aria-selected="true" type="button">Regla espectral</button>
-        <button role="tab" id="mML" aria-selected="false" type="button">Con muestras</button>
-      </div>
-
-      <div id="ruleBox">
-        <p class="hint">El guano de dieta de krill es rosado: refleja más rojo que azul y absorbe en el verde. Los umbrales cambian con cada escena; ajustarlos mirando el visor.</p>
-        <label class="check"><input id="pRel" type="checkbox"> Umbrales relativos a cada escena</label>
-        <div class="slider" id="rowKri"><label for="pKri">Enrojecimiento: desvíos sobre el suelo típico <output id="oKri"></output></label><input id="pKri" type="range" min="1" max="8" step="0.1"></div>
-        <div class="slider" id="rowKax"><label for="pKax">Tinte rosado: desvíos sobre el suelo típico <output id="oKax"></output></label><input id="pKax" type="range" min="0" max="6" step="0.1"></div>
-        <p class="hint" id="relNote"></p>
-        <div class="slider" id="rowRi"><label for="pRi">Enrojecimiento mínimo <output id="oRi"></output></label><input id="pRi" type="range" min="0" max="0.5" step="0.005"></div>
-        <div class="slider" id="rowAx"><label for="pAx">Tinte rosado mínimo <output id="oAx"></output></label><input id="pAx" type="range" min="-0.08" max="0.12" step="0.002"></div>
-        <div class="slider"><label for="pLmin">Brillo mínimo <output id="oLmin"></output></label><input id="pLmin" type="range" min="0" max="0.6" step="0.01"></div>
-        <div class="slider"><label for="pLmax">Brillo máximo <output id="oLmax"></output></label><input id="pLmax" type="range" min="0.3" max="1.3" step="0.01"></div>
-        <div class="slider" id="rowNdvi"><label for="pNdvi">Vegetación: NDVI máximo <output id="oNdvi"></output></label><input id="pNdvi" type="range" min="-0.2" max="0.9" step="0.01"></div>
-        <div class="slider" id="rowNdwi"><label for="pNdwi">Agua: NDWI máximo <output id="oNdwi"></output></label><input id="pNdwi" type="range" min="-0.5" max="0.8" step="0.01"></div>
-        <div class="slider" id="rowNdsi"><label for="pNdsi">Nieve: NDSI máximo <output id="oNdsi"></output></label><input id="pNdsi" type="range" min="-0.2" max="0.9" step="0.01"></div>
-        <button class="btn ghost" id="ruleReset" type="button">Volver a los umbrales iniciales</button>
+        <label class="check" id="roiRow" hidden><input id="roiOn" type="checkbox"> <span id="roiLbl">Analizar sólo la zona de interés</span></label>
+        <details class="live">
+          <summary>Limpiar lo detectado</summary>
+          <div class="col">
+            <div class="slider"><label for="open">Quitar puntos sueltos <output id="oOpen"></output></label><input id="open" type="range" min="0" max="4" step="1"></div>
+            <div class="slider"><label for="close">Cerrar huecos <output id="oClose"></output></label><input id="close" type="range" min="0" max="6" step="1"></div>
+            <div class="field"><label for="minArea" id="minAreaLbl">Superficie mínima de un grupo (m²)</label><input id="minArea" type="number" min="0" step="any" inputmode="decimal"></div>
+          </div>
+        </details>
       </div>
 
-      <div id="mlBox" hidden>
-        <p class="hint">Elegir una clase y tocar la imagen donde se la reconoce. Con dos o tres toques de guano y algunos de lo que lo rodea, el clasificador de máxima verosimilitud separa las clases.</p>
-        <div class="chips" id="chips" role="radiogroup" aria-label="Clase de la muestra"></div>
-        <div class="slider"><label for="brush">Radio del pincel <output id="oBrush"></output></label><input id="brush" type="range" min="1" max="20" step="1"></div>
-        <div class="slider"><label for="tol">Tolerancia del guano <output id="oTol"></output></label><input id="tol" type="range" min="4" max="60" step="1"></div>
-        <div class="row">
-          <button class="btn ghost" id="undoSample" type="button">Deshacer</button>
-          <button class="btn ghost" id="clearSamples" type="button">Borrar muestras</button>
+      <div class="pane" id="p-resultado" hidden>
+        <p class="pill" id="aptitude"></p>
+        <dl class="kpi">
+          <div><dt>Superficie con guano</dt><dd id="kArea">—</dd><dd class="sub" id="kAreaSub"></dd></div>
+          <div><dt>Grupos detectados</dt><dd id="kGroups">—</dd><dd class="sub" id="kGroupsSub"></dd></div>
+          <div class="accent"><dt>Parejas estimadas</dt><dd id="kPairs">—</dd><dd class="sub" id="kPairsSub"></dd></div>
+          <div id="kIndWrap" hidden><dt>Individuos contados</dt><dd id="kInd">—</dd><dd class="sub" id="kIndSub"></dd></div>
+        </dl>
+        <p class="truth" id="truth" hidden></p>
+        <p class="warn" id="warn" hidden></p>
+        <h3>Cada grupo</h3>
+        <div class="tablewrap"><table id="tbl"><thead><tr><th>N.º</th></tr></thead><tbody></tbody></table></div>
+        <p class="hint" id="tblNote"></p>
+        <h3>Guardar</h3>
+        <div class="col">
+          <button class="btn primary" id="goSerie" type="button">Agregar esta detección a mi serie</button>
+          <button class="btn" id="exCsv" type="button">Tabla de grupos (CSV)</button>
+          <button class="btn" id="exGeo" type="button">Polígonos para QGIS (GeoJSON)</button>
+          <button class="btn" id="exInd" type="button" hidden>Posición de los individuos (CSV)</button>
+          <button class="btn" id="exPng" type="button">Mapa con lo detectado (PNG)</button>
         </div>
       </div>
 
-      <label class="check" id="roiRow" hidden><input id="roiOn" type="checkbox"> <span id="roiLbl">Analizar sólo la zona de interés</span></label>
-      <h3>Limpieza de la máscara</h3>
-      <div class="slider"><label for="open">Quitar puntos sueltos <output id="oOpen"></output></label><input id="open" type="range" min="0" max="4" step="1"></div>
-      <div class="slider"><label for="close">Cerrar huecos <output id="oClose"></output></label><input id="close" type="range" min="0" max="6" step="1"></div>
-      <div class="field"><label for="minArea" id="minAreaLbl">Superficie mínima de un grupo (m²)</label><input id="minArea" type="number" min="0" step="any" inputmode="decimal"></div>
-    </section>
-
-    <section class="block">
-      <h2><span class="step">5</span>De superficie a parejas</h2>
-      <div class="field">
-        <label for="species">Densidad de nidos</label>
-        <select id="species">
-          <option value="adelia">Adelia: 0,63 ± 0,3 parejas/m² (Mawson)</option>
-          <option value="custom">Valor propio o calibrado</option>
-        </select>
+      <div class="pane" id="p-ajustes" hidden>
+        <details class="live" open>
+          <summary>De superficie a parejas</summary>
+          <div class="col">
+            <div class="field">
+              <label for="species">Densidad de nidos</label>
+              <select id="species">
+                <option value="adelia">Adelia: 0,63 ± 0,3 parejas/m² (Mawson)</option>
+                <option value="custom">Valor propio o calibrado</option>
+              </select>
+            </div>
+            <div class="bands three">
+              <div class="field"><label for="dLo">Mínima</label><input id="dLo" type="number" min="0" step="any" inputmode="decimal"></div>
+              <div class="field"><label for="dMid">Central</label><input id="dMid" type="number" min="0" step="any" inputmode="decimal"></div>
+              <div class="field"><label for="dHi">Máxima</label><input id="dHi" type="number" min="0" step="any" inputmode="decimal"></div>
+            </div>
+            <div class="field">
+              <label for="known">Calibrar con un censo de terreno (parejas contadas)</label>
+              <div class="row tight">
+                <input id="known" type="number" min="0" step="1" inputmode="numeric" placeholder="por ejemplo 5383">
+                <button class="btn" id="calib" type="button">Calibrar</button>
+              </div>
+              <p class="hint">Divide las parejas contadas por la superficie detectada. No hay un valor publicado de uso general para el papúa.</p>
+            </div>
+          </div>
+        </details>
+        <details class="live">
+          <summary>Bandas y escala de la imagen</summary>
+          <div class="col">
+            <div class="field">
+              <label for="preset">Orden de bandas</label>
+              <select id="preset">
+                <option value="rgb">Rojo, verde, azul</option>
+                <option value="bgrn">Azul, verde, rojo, infrarrojo (PlanetScope, Sentinel-2 a 10 m)</option>
+                <option value="wv8">WorldView-2/3, 8 bandas</option>
+                <option value="l8">Landsat 8/9, bandas 1 a 7</option>
+                <option value="s2">Sentinel-2, bandas 1 a 12 apiladas</option>
+                <option value="custom">Elegir a mano</option>
+              </select>
+            </div>
+            <div class="bands" id="bandGrid">
+              <div class="field"><label for="bR">Rojo</label><select id="bR"></select></div>
+              <div class="field"><label for="bG">Verde</label><select id="bG"></select></div>
+              <div class="field"><label for="bB">Azul</label><select id="bB"></select></div>
+              <div class="field"><label for="bN">Infrarrojo cercano</label><select id="bN"></select></div>
+              <div class="field"><label for="bS">Infrarrojo medio</label><select id="bS"></select></div>
+            </div>
+            <div class="field">
+              <label for="gsd">Tamaño de píxel de la imagen original (m)</label>
+              <div class="row tight">
+                <input id="gsd" type="number" min="0" step="any" inputmode="decimal" placeholder="por ejemplo 0,5">
+                <button class="btn" id="toolMeasure" type="button" aria-pressed="false">Medir</button>
+              </div>
+              <p class="hint" id="gsdNote"></p>
+            </div>
+            <div class="measure" id="measureBox" hidden>
+              <p class="hint" id="measureTxt"></p>
+              <div class="row tight">
+                <input id="measureM" type="number" min="0" step="any" inputmode="decimal" placeholder="distancia real (m)" aria-label="Distancia real entre los dos puntos, en metros">
+                <button class="btn" id="measureApply" type="button">Aplicar</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="maxpx">Detalle del análisis</label>
+              <select id="maxpx">
+                <option value="4">Estándar: hasta 4 megapíxeles</option>
+                <option value="9">Sector amplio o mucho detalle: hasta 9 megapíxeles</option>
+              </select>
+            </div>
+          </div>
+        </details>
+        <details class="live">
+          <summary>Relieve</summary>
+          <div class="col">
+            <label class="btn" for="demFile">Cargar un modelo de elevación</label>
+            <input id="demFile" type="file" accept=".tif,.tiff,image/tiff" class="visually-hidden">
+            <p class="hint" id="demNote"></p>
+            <div id="demBox" class="col" hidden>
+              <label class="check"><input id="terrOn" type="checkbox"> Descartar lo que esté fuera de estos límites</label>
+              <div class="slider"><label for="tSlope">Pendiente máxima <output id="oTSlope"></output></label><input id="tSlope" type="range" min="5" max="60" step="1"></div>
+              <div class="slider"><label for="tElev">Cota máxima <output id="oTElev"></output></label><input id="tElev" type="range" min="5" max="400" step="5"></div>
+            </div>
+          </div>
+        </details>
+        <details class="live">
+          <summary>Contar individuos (sólo imágenes de dron)</summary>
+          <div class="col">
+            <label class="check"><input id="indOn" type="checkbox"> Contar aves como manchas oscuras</label>
+            <p class="hint" id="indNote"></p>
+            <div id="indBox" class="col" hidden>
+              <div class="slider"><label for="indDiam">Tamaño del ave vista desde arriba <output id="oDiam"></output></label><input id="indDiam" type="range" min="0.15" max="0.8" step="0.01"></div>
+              <div class="slider"><label for="indK">Exigencia de contraste <output id="oK"></output></label><input id="indK" type="range" min="2" max="12" step="0.5"></div>
+              <label class="check"><input id="indGuano" type="checkbox" checked> Sólo sobre el guano detectado y a un metro de su borde</label>
+            </div>
+          </div>
+        </details>
       </div>
-      <div class="bands three">
-        <div class="field"><label for="dLo">Mínima</label><input id="dLo" type="number" min="0" step="any" inputmode="decimal"></div>
-        <div class="field"><label for="dMid">Central</label><input id="dMid" type="number" min="0" step="any" inputmode="decimal"></div>
-        <div class="field"><label for="dHi">Máxima</label><input id="dHi" type="number" min="0" step="any" inputmode="decimal"></div>
-      </div>
-      <div class="field">
-        <label for="known">Calibrar con un censo de terreno (parejas contadas)</label>
-        <div class="row tight">
-          <input id="known" type="number" min="0" step="1" inputmode="numeric" placeholder="por ejemplo 5383">
-          <button class="btn" id="calib" type="button">Calibrar</button>
-        </div>
-        <p class="hint">Divide las parejas contadas por la superficie detectada y usa ese cociente como densidad propia del sitio. No hay un valor publicado de uso general para el papúa: conviene calibrar.</p>
-      </div>
-    </section>
-
-    <section class="block">
-      <h2><span class="step">6</span>Individuos</h2>
-      <label class="check"><input id="indOn" type="checkbox"> Contar individuos como manchas oscuras</label>
-      <p class="hint" id="indNote"></p>
-      <div id="indBox" hidden>
-        <div class="slider"><label for="indDiam">Tamaño del ave vista desde arriba <output id="oDiam"></output></label><input id="indDiam" type="range" min="0.15" max="0.8" step="0.01"></div>
-        <div class="slider"><label for="indK">Exigencia de contraste <output id="oK"></output></label><input id="indK" type="range" min="2" max="12" step="0.5"></div>
-        <label class="check"><input id="indGuano" type="checkbox" checked> Sólo sobre el guano detectado y a un metro de su borde</label>
-      </div>
-    </section>
-
-  </aside>
-
-  <section class="stage" aria-label="Visor">
-    <div class="toolbar">
-      <div class="seg small" role="group" aria-label="Herramienta">
-        <button id="toolPan" aria-pressed="true" type="button">Mover</button>
-        <button id="toolSample" aria-pressed="false" type="button">Muestrear</button>
-      </div>
-      <div class="field inline"><label for="mode">Vista</label>
-        <select id="mode">
-          <option value="rgb">Color</option>
-          <option value="cir">Falso color infrarrojo</option>
-          <option value="ri">Enrojecimiento</option>
-          <option value="ax">Tinte rosado</option>
-          <option value="ndvi">NDVI</option>
-          <option value="elev">Elevación</option>
-          <option value="slope">Pendiente</option>
-          <option value="shade">Sombreado del relieve</option>
-        </select>
-      </div>
-      <div class="slider inline"><label for="gamma">Realce</label><input id="gamma" type="range" min="0.3" max="1.6" step="0.02"></div>
-      <div class="ovgroup">
-        <label class="check inline"><input id="ovOn" type="checkbox" checked> Detección</label>
-        <div class="slider inline"><label for="ovA" class="visually-hidden">Opacidad de la detección</label><input id="ovA" type="range" min="0" max="1" step="0.02"></div>
-      </div>
-      <div class="zoom">
-        <button class="btn icon" id="zOut" type="button" aria-label="Alejar">−</button>
-        <button class="btn icon" id="zFit" type="button" aria-label="Ajustar a la ventana">Ajustar</button>
-        <button class="btn icon" id="zIn" type="button" aria-label="Acercar">+</button>
-      </div>
-    </div>
-    <div class="viewport" id="viewport">
-      <canvas id="view" tabindex="0" aria-label="Imagen con la detección superpuesta"></canvas>
-      <div class="busy" id="busy" hidden><span id="busyTxt">Procesando…</span></div>
-      <div class="drop" id="drop" hidden>Soltar la imagen aquí</div>
-      <div class="scalebar" id="scalebar" hidden><span id="scaleTxt"></span><i id="scaleLine"></i></div>
-    </div>
-    <p class="readout" id="readout">Pasar el cursor sobre la imagen para leer los valores de cada píxel.</p>
+    </aside>
   </section>
 
-  <aside class="panel results" aria-label="Resultados">
-    <section class="block">
-      <h2>Resultado</h2>
-      <p class="pill" id="aptitude"></p>
-      <dl class="kpi">
-        <div><dt>Superficie con guano</dt><dd id="kArea">—</dd><dd class="sub" id="kAreaSub"></dd></div>
-        <div><dt>Grupos detectados</dt><dd id="kGroups">—</dd><dd class="sub" id="kGroupsSub"></dd></div>
-        <div class="accent"><dt>Parejas estimadas</dt><dd id="kPairs">—</dd><dd class="sub" id="kPairsSub"></dd></div>
-        <div id="kIndWrap" hidden><dt>Individuos contados</dt><dd id="kInd">—</dd><dd class="sub" id="kIndSub"></dd></div>
-      </dl>
-      <p class="truth" id="truth" hidden></p>
-      <p class="warn" id="warn" hidden></p>
-    </section>
-
-    <section class="block">
-      <h2>Grupos</h2>
-      <div class="tablewrap">
-        <table id="tbl">
-          <thead><tr><th>N.º</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <p class="hint" id="tblNote"></p>
-    </section>
-
-    <section class="block">
-      <h2>Exportar</h2>
-      <div class="col">
-        <button class="btn" id="exCsv" type="button">Tabla de grupos (CSV)</button>
-        <button class="btn" id="exGeo" type="button">Polígonos de los grupos (GeoJSON)</button>
-        <button class="btn" id="exInd" type="button" hidden>Posición de los individuos (CSV)</button>
-        <button class="btn" id="exPng" type="button">Mapa con la detección (PNG)</button>
-      </div>
-      <p class="hint" id="exNote">Con una imagen georreferenciada, los polígonos salen en longitud y latitud WGS 84 y se abren en QGIS.</p>
-    </section>
-  </aside>
-
-</main>
-
-<section class="band" id="tiempo">
-  <header class="bandhead">
-    <h2>Seguimiento por temporadas</h2>
-    <p class="lede">Conteos publicados de 70 colonias del sector, <span id="spanYears">desde 1965/66</span>, y las detecciones propias que se vayan guardando. Elegir una colonia en el mapa para ver su serie.</p>
-  </header>
-  <div class="bandgrid">
-    <div class="col">
+  <!-- ===================== COLONIAS Y CENSOS ===================== -->
+  <section class="view two" id="v-censos" hidden>
+    <div class="colscroll">
+      <h2>Las colonias del sector</h2>
+      <p class="hint">Conteos publicados de 70 colonias, <span id="spanYears">desde 1965/66</span>. Tocar una colonia para ver su serie a la derecha.</p>
       <div class="mapwrap"><canvas id="regMap" aria-label="Mapa de colonias de la Isla 25 de Mayo y vecinas"></canvas></div>
-      <p class="hint">Costa simplificada de Natural Earth a escala 1:10 millones: sirve de ubicación, no de cartografía. El tamaño del círculo crece con el último conteo; el color indica la especie más numerosa.</p>
+      <p class="hint">El círculo crece con el último conteo; el color indica la especie más numerosa. Costa simplificada: sirve de ubicación, no de cartografía.</p>
       <div class="siteinfo" id="siteInfo"></div>
     </div>
-    <div class="col">
+    <div class="colscroll">
+      <h2>Conteos por temporada</h2>
       <div class="chartwrap"><canvas id="serie" aria-label="Serie de conteos por temporada"></canvas><div class="tip" id="tip" hidden></div></div>
       <div class="legend" id="legend"></div>
       <h3>El ciclo reproductivo y la señal en la imagen</h3>
       <div class="phenowrap"><table class="pheno" id="pheno"></table></div>
-      <p class="hint">Calendario aproximado para Punta Stranger. En temporadas de mucha nieve la eclosión del papúa se corrió unas cinco semanas. Comparar entre temporadas sólo imágenes de la misma fase.</p>
+      <p class="hint">Calendario aproximado para Punta Stranger. Con nieve tardía la señal se corre a fines de diciembre. Comparar entre temporadas sólo imágenes de la misma fase.</p>
     </div>
-  </div>
-  <div class="bandgrid">
-    <div class="block">
-      <h3 class="first">Guardar la detección actual en la serie</h3>
+  </section>
+
+  <!-- ===================== MI SERIE ===================== -->
+  <section class="view two" id="v-serie" hidden>
+    <div class="colscroll">
+      <h2>Detecciones guardadas</h2>
+      <p class="hint" id="recHint"></p>
+      <div class="tablewrap tall"><table id="recs"><thead><tr><th>Fecha</th><th>Temporada</th><th>Fase: Adelia · papúa</th><th>Señal</th><th>Píxel</th><th>Superficie</th><th>Parejas</th><th></th></tr></thead><tbody></tbody></table></div>
+      <p class="hint" id="recsNote"></p>
+      <div class="row">
+        <button class="btn" id="serCsv" type="button">Serie (CSV)</button>
+        <button class="btn" id="serJson" type="button">Serie completa (JSON)</button>
+        <label class="btn" for="serImport">Importar serie</label>
+        <input id="serImport" type="file" accept=".json,application/json" class="visually-hidden">
+      </div>
+      <p class="hint">La serie se recuerda en este navegador. Para conservarla o llevarla a otra computadora, exportarla en JSON.</p>
+    </div>
+    <div class="colscroll">
+      <h2>Guardar la detección actual</h2>
       <div class="bands">
         <div class="field"><label for="recDate">Fecha de la imagen</label><input id="recDate" type="date" min="1956-01-01" max="2030-12-31"></div>
         <div class="field"><label for="recLabel">Sensor o nota</label><input id="recLabel" type="text" maxlength="60" placeholder="por ejemplo Sentinel-2"></div>
       </div>
-      <button class="btn primary" id="recAdd" type="button">Agregar a la serie de la colonia elegida</button>
-      <p class="hint" id="recHint"></p>
-      <h3>Qué cambió entre dos fechas</h3>
+      <button class="btn primary" id="recAdd" type="button">Agregar a la serie</button>
+      <h2 class="gap">Qué cambió entre dos fechas</h2>
       <div class="bands">
         <div class="field"><label for="cmpA">Fecha anterior</label><select id="cmpA"></select></div>
         <div class="field"><label for="cmpB">Fecha posterior</label><select id="cmpB"></select></div>
       </div>
       <button class="btn" id="cmpRun" type="button">Calcular el mapa de cambios</button>
-      <p class="hint" id="cmpTxt">Hacen falta dos detecciones guardadas del mismo lugar: georreferenciadas o con el mismo encuadre.</p>
+      <p class="hint" id="cmpTxt">Elegir dos fechas guardadas del mismo lugar. El mapa muestra qué se mantuvo, qué apareció y qué desapareció.</p>
       <div class="cmpwrap" id="cmpWrap" hidden><canvas id="cmpMap" aria-label="Mapa de cambios entre las dos fechas"></canvas>
         <p class="keys"><span><i class="k1"></i>Se mantiene</span><span><i class="k2"></i>Aparece</span><span><i class="k3"></i>Desaparece</span></p></div>
     </div>
-    <div class="block">
-      <h3 class="first">Detecciones guardadas</h3>
-      <div class="tablewrap tall"><table id="recs"><thead><tr><th>Fecha</th><th>Temporada</th><th>Fase: Adelia · papúa</th><th>Señal</th><th>Píxel</th><th>Superficie</th><th>Parejas</th><th></th></tr></thead><tbody></tbody></table></div>
-      <p class="hint" id="recsNote"></p>
-      <div class="row">
-        <button class="btn" id="serCsv" type="button">Serie (CSV)</button>
-        <button class="btn" id="serJson" type="button">Serie completa con máscaras (JSON)</button>
-        <label class="btn" for="serImport">Importar serie</label>
-        <input id="serImport" type="file" accept=".json,application/json" class="visually-hidden">
-      </div>
-      <p class="hint">La serie se recuerda en este navegador. Para conservarla o pasarla a otra computadora, exportarla en JSON.</p>
-    </div>
-  </div>
-</section>
+  </section>
 
-<section class="notes">
+  <!-- ===================== CÓMO FUNCIONA ===================== -->
+  <section class="view" id="v-ayuda" hidden>
+    <div class="colscroll help">
+      <h2>Cómo funciona, en cuatro pasos</h2>
+      <ol class="steps">
+        <li><b>Elegir una imagen.</b> En «Imagen» hay trece fotos satelitales reales de la península. Conviene empezar por una marcada «colonia visible».</li>
+        <li><b>La app detecta sola.</b> Apenas se abre la imagen, busca el color del guano y lo pinta de celeste. No se cuentan pingüinos: desde un satélite un ave es más chica que un píxel. Se mide la mancha que deja la colonia.</li>
+        <li><b>Corregir si hace falta.</b> En «Detección» se puede pedir más o menos exigencia. Si la detección automática no convence, «Con ejemplos» permite tocar el guano y lo que no es guano para enseñarle.</li>
+        <li><b>Leer y guardar.</b> «Resultado» muestra la superficie, los grupos y una estimación de parejas. «Agregar a mi serie» la guarda con su fecha para compararla con otras temporadas y con los censos publicados.</li>
+      </ol>
+      <p class="callout">Si el resultado es cero, casi siempre es porque la nieve o las nubes tapan la colonia en esa fecha. La franja sobre la imagen lo avisa.</p>
+      <div class="notes">
 
   <article>
     <h2>Qué se ve desde el espacio y qué no</h2>
@@ -413,7 +449,11 @@
     <p class="hint">Imágenes libres: <a href="https://browser.dataspace.copernicus.eu/">Copernicus Browser</a> (Sentinel-2) y <a href="https://earthexplorer.usgs.gov/">USGS EarthExplorer</a> (Landsat). Para muy alta resolución hacen falta imágenes comerciales o convenios institucionales.</p>
   </article>
 
-</section>
+      </div>
+    </div>
+  </section>
+
+</main>
 
 <div class="modal" id="modal" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
@@ -434,5 +474,6 @@
 <script src="app.js"></script>
 <script src="tiempo.js"></script>
 <script src="sentinel.js"></script>
+<script src="ui.js"></script>
 </body>
 </html>

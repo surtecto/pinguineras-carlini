@@ -135,7 +135,9 @@
   })();
   fetch('datos/catalogo.json').then(function (r) { if (!r.ok) throw new Error('sin catálogo'); return r.json(); }).then(function (c) {
     CAT = c; var sel = $('s2cat');
-    c.escenas.forEach(function (e) { sel.add(new Option(e.fecha.split('-').reverse().join('/') + ' · temporada ' + PE.seasonLabel(PE.season(e.fecha)) + ' · ' + Math.round(e.nubes * 100) + ' % nubes', e.archivo)); });
+    var g1 = document.createElement('optgroup'), g2 = document.createElement('optgroup'); g1.label = 'Con la colonia visible'; g2.label = 'Colonia tapada por nieve o nubes';
+    c.escenas.forEach(function (e) { var vis = e.zonaVisible >= 0.8; (vis ? g1 : g2).appendChild(new Option(e.fecha.split('-').reverse().join('/') + (vis ? ' · colonia visible' : ' · tapada'), e.archivo)); });
+    sel.appendChild(g1); sel.appendChild(g2);
     var def = c.escenas.filter(function (e) { return e.archivo === c.porDefecto; })[0] || c.escenas[0];
     sel.value = def.archivo; return loadBundled(def);
   }).catch(function () { $('s2box').hidden = true; A.demo(); });

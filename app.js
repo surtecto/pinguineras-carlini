@@ -3,11 +3,7 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var MAXPX = 4e6;
-  var CLASSES = [
-    { id: 'guano', label: 'Guano', color: '#ff5fa2' }, { id: 'roca', label: 'Roca y suelo', color: '#a9b4b9' },
-    { id: 'nieve', label: 'Nieve y hielo', color: '#ffffff' }, { id: 'agua', label: 'Agua', color: '#3f8cff' },
-    { id: 'veg', label: 'Musgo y líquenes', color: '#63d46d' }, { id: 'otro', label: 'Otro confusor', color: '#f7b93e' }
-  ];
+  var CLASSES = [{ id: 'guano', label: 'Esto es guano', color: '#ff5fa2' }, { id: 'no', label: 'Esto no es guano', color: '#ffd23f' }];
   var PRESETS = {
     rgb: { r: 0, g: 1, b: 2, nir: -1, swir: -1 }, bgrn: { r: 2, g: 1, b: 0, nir: 3, swir: -1 },
     wv8: { r: 4, g: 2, b: 1, nir: 6, swir: -1 }, l8: { r: 3, g: 2, b: 1, nir: 4, swir: 5 }, s2: { r: 3, g: 2, b: 1, nir: 7, swir: 10 }
@@ -162,6 +158,7 @@
   /* ---------- estado de la escena ---------- */
   function setScene(sc) {
     S.scene = sc; S.samples = []; S.res = null; S.blobs = null; S.sel = 0; S.measure = []; S.down = sc.down || 1;
+    var g0 = PE.gsd(sc); S.brush = g0 && g0 >= 5 ? 2 : 4; // en imágenes de píxel grueso, un toque chico para no mezclar la mancha con su entorno
     S.gamma = sc.gamma || (sc.eightBit ? 1 : 0.6); S.mode = 'rgb'; S.method = 'rule'; S.tool = 'pan'; S.warn = '';
     S.dens = { lo: 0.33, mid: 0.63, hi: 0.93 }; $('species').value = 'adelia'; $('known').value = ''; $('measureBox').hidden = true;
     S.terr.on = false; $('terrOn').checked = false; if (sc.dem) { sc.elev = sc.dem; sc.demName = sc.demName || 'relieve sintético'; } computeTerrain();
@@ -169,7 +166,7 @@
     S.ind.on = false; $('indOn').checked = false;
     base.width = fill.width = edge.width = sc.w; base.height = fill.height = edge.height = sc.h;
     $('preset').value = sc.preset || 'rgb';
-    buildBandSelects(); syncControls(); renderBase(); fitView(); schedule(0);
+    buildBandSelects(); syncControls(); renderBase(); fitView(true); schedule(0);
     var note = sc.note || (sc.name + ' · ' + sc.orig[0] + ' × ' + sc.orig[1] + ' píxeles, ' + sc.n + (sc.n === 1 ? ' banda' : ' bandas') +
       (S.down > 1.01 ? '. Se analiza a 1/' + nf1.format(S.down) + ' de su resolución para que el navegador responda.' : '.'));
     $('sceneNote').textContent = note;
@@ -225,7 +222,7 @@
       var dot = document.createElement('i'); dot.style.background = c.color; b.appendChild(dot);
       b.appendChild(document.createTextNode(c.label));
       var n = document.createElement('b'); n.textContent = counts[c.id] || 0; b.appendChild(n);
-      b.addEventListener('click', function () { S.cls = c.id; setTool('sample'); renderChips(); });
+      b.addEventListener('click', function () { S.cls = c.id; setTool('sample'); renderChips(); document.dispatchEvent(new CustomEvent('pc:result')); });
       box.appendChild(b);
     });
   }
@@ -257,11 +254,23 @@
         raw = PE.classifyRule(sc, S.rule);
         if (sc.map.r === sc.map.b) warn = 'La imagen tiene una sola banda visible: la regla espectral necesita color. Usar el método con muestras.';
       } else {
-        var model = PE.trainML(sc, S.samples);
-        if (!model.cls.some(function (c) { return c.id === 'guano'; })) { raw = new Uint8Array(sc.w * sc.h); warn = 'Falta al menos una muestra de guano: elegir «Guano» y tocar una mancha en la imagen.'; }
+        // cada ejemplo de «no es guano» es una clase propia: nieve, roca y agua no se parecen entre sí
+        var tr = S.samples.map(function (q, k) { return q.cls === 'guano' ? q : { cls: 'no' + k, x: q.x, y: q.y, r: q.r }; });
+        var gm = sc.map.nir >= 0 || sc.map.swir >= 0 ? PE.groundMask(sc, S.rule) : null;
+        if (gm) { // clase implícita «suelo común»: así el primer toque ya distingue la mancha del terreno que la rodea
+          var bb = sc.roi && sc.roiOn && sc.roiBox ? sc.roiBox : [0, 0, sc.w, sc.h], st = Math.max(1, Math.round(Math.sqrt((bb[2] - bb[0]) * (bb[3] - bb[1]) / 1500)));
+          for (var gy = bb[1]; gy < bb[3]; gy += st) for (var gx = bb[0]; gx < bb[2]; gx += st) {
+            if (!gm[gy * sc.w + gx]) continue;
+            var near = false; for (var k2 = 0; k2 < S.samples.length; k2++) { var q2 = S.samples[k2]; if (Math.abs(q2.x - gx) <= q2.r + 2 && Math.abs(q2.y - gy) <= q2.r + 2) { near = true; break; } }
+            if (!near) tr.push({ cls: 'suelo', x: gx, y: gy, r: 0 });
+          }
+        }
+        var model = PE.trainML(sc, tr);
+        if (!model.cls.some(function (c) { return c.id === 'guano'; })) { raw = new Uint8Array(sc.w * sc.h); warn = 'Falta marcar guano: elegir «Esto es guano» y tocar una mancha en la imagen.'; }
         else {
           raw = PE.classifyML(sc, model, S.tol, 'guano');
-          if (model.cls.length === 1) warn = 'Sólo hay muestras de guano. Agregar muestras de roca, nieve o agua mejora mucho la separación.';
+          if (gm) for (var u = 0; u < raw.length; u++) if (raw[u] && !gm[u]) raw[u] = 0; // un toque nunca pinta mar, nieve ni vegetación
+          if (!S.samples.some(function (q) { return q.cls !== 'guano'; })) warn = 'Sólo marcaste guano. Si se pintó de más, elegir «Esto no es guano» y tocar esas partes.';
         }
       }
       if (sc.roi && sc.roiOn) { for (var z = 0; z < raw.length; z++) if (raw[z] && !sc.roi[z]) raw[z] = 0; }
@@ -375,10 +384,15 @@
 
   /* ---------- visor ---------- */
   function minK() { var r = cv.getBoundingClientRect(), sc = S.scene; return Math.min(r.width / sc.w, r.height / sc.h) * 0.5; }
-  function fitView() {
+  function fitView(zone) {
     var r = cv.getBoundingClientRect(), sc = S.scene; if (!sc || !r.width) return;
-    var k = Math.min(r.width / sc.w, r.height / sc.h);
-    S.view = { k: k, x: (r.width - sc.w * k) / 2, y: (r.height - sc.h * k) / 2 };
+    var bx = [0, 0, sc.w, sc.h];
+    if (zone === true && sc.roi && sc.roiOn && sc.roiBox) { // encuadra la zona analizada con aire alrededor
+      var b = sc.roiBox, mx = (b[2] - b[0]) * 0.45, my = (b[3] - b[1]) * 0.45;
+      bx = [Math.max(0, b[0] - mx), Math.max(0, b[1] - my), Math.min(sc.w, b[2] + mx), Math.min(sc.h, b[3] + my)];
+    }
+    var k = Math.min(r.width / (bx[2] - bx[0]), r.height / (bx[3] - bx[1]));
+    S.view = { k: k, x: (r.width - (bx[0] + bx[2]) * k) / 2, y: (r.height - (bx[1] + bx[3]) * k) / 2 };
     draw();
   }
   function zoomAt(f, sx, sy) {
@@ -447,8 +461,7 @@
     cv.setPointerCapture(e.pointerId); var p = local(e); ptrs.set(e.pointerId, p);
     if (ptrs.size === 2) { var a = Array.from(ptrs.values()); pinch = { d: Math.hypot(a[0][0] - a[1][0], a[0][1] - a[1][1]) }; drag = null; return; }
     var im = toImg(p[0], p[1]);
-    drag = { sx: p[0], sy: p[1], vx: S.view.x, vy: S.view.y, moved: false, pan: S.tool === 'pan' || e.button === 1, last: im };
-    if (S.tool === 'sample' && e.button === 0) addSample(im[0], im[1]);
+    drag = { sx: p[0], sy: p[1], vx: S.view.x, vy: S.view.y, moved: false, pan: true, last: im };
   });
   cv.addEventListener('pointermove', function (e) {
     if (!S.scene) return;
@@ -462,7 +475,6 @@
     if (drag) {
       if (Math.hypot(p[0] - drag.sx, p[1] - drag.sy) > 4) drag.moved = true;
       if (drag.pan) { S.view.x = drag.vx + p[0] - drag.sx; S.view.y = drag.vy + p[1] - drag.sy; draw(); }
-      else if (S.tool === 'sample') { var im = toImg(p[0], p[1]); if (Math.hypot(im[0] - drag.last[0], im[1] - drag.last[1]) > S.brush * 2 + 1) { addSample(im[0], im[1]); drag.last = im; } }
     } else readout(p);
   });
   function endPtr(e) {
@@ -480,7 +492,9 @@
         $('measureBox').hidden = false; $('measureM').focus();
       } else { $('measureTxt').textContent = 'Marcar el segundo punto.'; $('measureBox').hidden = false; }
       draw();
-    } else if (S.tool === 'pan' && inside && S.res) {
+    } else if (S.method === 'ml' && inside) {
+      addSample(im[0], im[1]);
+    } else if (inside && S.res) {
       selectComp(S.res.labels[Math.floor(im[1]) * sc.w + Math.floor(im[0])] || 0, false);
     }
   }
@@ -489,7 +503,7 @@
   cv.addEventListener('keydown', function (e) {
     if (!S.scene) return; var r = cv.getBoundingClientRect(), st = 60, hit = true;
     if (e.key === 'ArrowLeft') S.view.x += st; else if (e.key === 'ArrowRight') S.view.x -= st; else if (e.key === 'ArrowUp') S.view.y += st; else if (e.key === 'ArrowDown') S.view.y -= st;
-    else if (e.key === '+' || e.key === '=') zoomAt(1.3, r.width / 2, r.height / 2); else if (e.key === '-') zoomAt(1 / 1.3, r.width / 2, r.height / 2); else if (e.key === '0') fitView(); else hit = false;
+    else if (e.key === '+' || e.key === '=') zoomAt(1.3, r.width / 2, r.height / 2); else if (e.key === '-') zoomAt(1 / 1.3, r.width / 2, r.height / 2); else if (e.key === '0') fitView(false); else hit = false;
     if (hit) { e.preventDefault(); draw(); }
   });
   function readout(p) {
@@ -529,7 +543,8 @@
   $('clearSamples').addEventListener('click', function () { S.samples = []; renderChips(); schedule(0); });
   $('zIn').addEventListener('click', function () { var r = cv.getBoundingClientRect(); zoomAt(1.4, r.width / 2, r.height / 2); });
   $('zOut').addEventListener('click', function () { var r = cv.getBoundingClientRect(); zoomAt(1 / 1.4, r.width / 2, r.height / 2); });
-  $('zFit').addEventListener('click', fitView);
+  $('zFit').addEventListener('click', function () { fitView(false); });
+  $('zZone').addEventListener('click', function () { fitView(true); });
 
   function mapChanged() { var sc = S.scene; sc._sea = undefined; PE.prepare(sc); if ((S.mode === 'cir' || S.mode === 'ndvi') && sc.map.nir < 0) S.mode = 'rgb'; syncControls(); renderBase(); schedule(0); }
   $('preset').addEventListener('change', function () {
@@ -658,9 +673,9 @@
   /* ---------- arranque ---------- */
   if (window.ResizeObserver) new ResizeObserver(function () { draw(); }).observe(vp);
   window.addEventListener('resize', draw);
-  if (!window.PC_WEB) { demo(PE.demoSatellite, 'Generando la escena de ejemplo…'); setTimeout(fitView, 400); }
+  if (!window.PC_WEB) { demo(PE.demoSatellite, 'Generando la escena de ejemplo…'); setTimeout(function () { fitView(true); }, 400); }
   window.__app = { S: S, loadFile: loadFile, loadDEM: loadDEM, fitView: fitView };
   window.PCApp = { toast: toast, save: save, fmtLen: fmtLen, busy: busy, setScene: setScene, ensureGeoTIFF: ensureGeoTIFF, fitView: fitView,
-    demo: function () { demo(PE.demoSatellite, 'Generando la escena de ejemplo…'); setTimeout(fitView, 400); },
-    current: function () { if (!S.scene || !S.res) return null; var t = totals(); return { scene: S.scene, res: S.res, px: t.px, m2: t.m2, dens: S.dens, method: S.method, gsd: PE.gsd(S.scene) }; } };
+    demo: function () { demo(PE.demoSatellite, 'Generando la escena de ejemplo…'); setTimeout(function () { fitView(true); }, 400); },
+    current: function () { if (!S.scene || !S.res) return null; var t = totals(); return { scene: S.scene, res: S.res, px: t.px, m2: t.m2, dens: S.dens, method: S.method, gsd: PE.gsd(S.scene), samples: S.samples, cls: S.cls, blobs: S.blobs }; } };
 })();

@@ -170,7 +170,7 @@
     });
     var withMask = mine.filter(function (r) { return r.rle; }), ca = mine.filter(function (r) { return r.id === $('cmpA').value; })[0], cb = mine.filter(function (r) { return r.id === $('cmpB').value; })[0];
     if (withMask.length > 1 && (!ca || !cb || !ca.rle || !cb.rle || ca === cb)) { $('cmpA').value = withMask[withMask.length - 2].id; $('cmpB').value = withMask[withMask.length - 1].id; }
-    $('recHint').textContent = 'Se guarda en la serie de ' + byId[T.site].n + '. Para otra colonia, elegirla antes en el mapa.';
+    $('recHint').textContent = 'Serie de ' + byId[T.site].n + '. Para ver o guardar en otra colonia, elegirla antes en el mapa de «Colonias y censos».';
   }
   $('recAdd').addEventListener('click', function () {
     var cur = A.current(), date = $('recDate').value;
