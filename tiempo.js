@@ -46,6 +46,7 @@
     var tileFail = false; sat.on('tileerror', function () { tileFail = true; coast(); }); sat.on('tileload', function () { if (tileFail) { tileFail = false; coast(); } });
     MAP.on('zoomend', coast);
     L.control.scale({ imperial: false }).addTo(MAP);
+    MAP.attributionControl.setPrefix('<a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a>');
     R.sites.slice().sort(function (a, b) { return mainSp(b)[1] - mainSp(a)[1]; }).forEach(function (s) {
       var m = mainSp(s), mk = L.circleMarker([s.la, s.lo], { radius: radius(s), color: '#fff', weight: 1, fillColor: css(SP[m[0]].v), fillOpacity: 0.85 }).addTo(MAP);
       mk.bindTooltip(s.n + ' · ' + nf0.format(m[1]) + ' ' + TY[latest(s)[m[0]][1]] + ' de ' + SP[m[0]].n.toLowerCase(), { direction: 'top' });

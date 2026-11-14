@@ -16,7 +16,7 @@
   function latOf(y, z) { var n = Math.PI - 2 * Math.PI * y / Math.pow(2, z); return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))); }
   function tile(z, x, y) {
     var k = z + '/' + y + '/' + x, t = X.tiles.get(k);
-    if (!t) { t = { img: new Image(), ok: false }; t.img.onload = function () { t.ok = true; A.draw(); }; t.img.src = TILE + k; X.tiles.set(k, t); if (X.tiles.size > 400) X.tiles.delete(X.tiles.keys().next().value); }
+    if (!t) { t = { img: new Image(), ok: false }; t.img.crossOrigin = 'anonymous'; t.img.onload = function () { t.ok = true; A.draw(); }; t.img.src = TILE + k; X.tiles.set(k, t); if (X.tiles.size > 400) X.tiles.delete(X.tiles.keys().next().value); }
     return t;
   }
   function under(ctx, r) {
