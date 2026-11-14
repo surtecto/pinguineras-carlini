@@ -43,7 +43,7 @@
     var msg;
     if (ml) {
       if (!g) msg = 'Modo con ejemplos: tocar en la imagen una mancha de guano, rosada o rojiza. Arrastrar sigue moviendo la imagen.';
-      else if (!no) msg = 'Se pintó de celeste todo lo que se parece a lo que se marcó como guano. Si pintó de más, elegir «Esto no es guano» y tocar esas partes.';
+      else if (!no) msg = 'Lo celeste es lo que se parece al guano marcado y no al suelo que lo rodea. Si pintó de más, elegir «Esto no es guano» y tocar esas partes; si falta, tocar otra mancha.';
       else msg = 'Lleva ' + g + (g === 1 ? ' toque' : ' toques') + ' de guano y ' + no + ' de lo que no es. Seguir hasta que lo celeste coincida con las manchas.';
     } else if (!n) {
       var cv = cover(sc);

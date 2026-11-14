@@ -8,7 +8,7 @@ Herramienta web para detectar colonias de pingüinos por la mancha de guano en i
 
 - Abre escenas Sentinel-2 reales de la Península Potter incluidas en el sitio, o busca otras fechas y sectores directamente en el archivo abierto de Copernicus.
 - Carga imágenes propias: GeoTIFF multibanda (WGS 84, UTM, EPSG:3031), PNG o JPG.
-- Detecta guano por regla espectral (umbrales fijos o relativos a cada escena) o por clasificación de máxima verosimilitud con muestras.
+- Detecta guano por regla espectral (umbrales fijos o relativos a cada escena) o por clasificación de máxima verosimilitud con ejemplos («esto es guano» / «esto no es guano»).
 - Separa grupos, mide superficie y estima parejas por densidad de nidos; cuenta individuos en imágenes de hasta 15 cm por píxel.
 - Con un modelo de elevación calcula cota, pendiente, orientación, distancia al mar y al grupo vecino.
 - Guarda detecciones por temporada, las compara con los censos de terreno publicados (70 colonias del sector desde 1956/57) y calcula mapas de cambio entre fechas.
@@ -27,6 +27,7 @@ Es una herramienta de exploración, **sin validación de campo**. A 10 m por pí
 | `app.js` | Visor, controles, resultados y exportación |
 | `tiempo.js` | Mapa del sector, series de censos, registro de detecciones |
 | `sentinel.js` | Escenas Sentinel-2 incluidas y lectura en vivo del archivo |
+| `ui.js` | pestañas, panel de tres pasos y franja de estado
 | `data.js` | Censos (MAPPPD) y línea de costa (Natural Earth) |
 | `datos/` | Recortes Sentinel-2, relieve Copernicus DEM, catálogo y serie inicial |
 | `vendor/geotiff.js` | Lector GeoTIFF (geotiff.js 2.1.3, licencia MIT) |
