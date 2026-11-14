@@ -261,7 +261,7 @@
 
   /* ---------- procesamiento ---------- */
   var runT = 0;
-  function schedule(ms) { clearTimeout(runT); runT = setTimeout(run, ms === undefined ? 90 : ms); }
+  function schedule(ms) { clearTimeout(runT); runT = setTimeout(run, ms === undefined ? 90 : ms); document.dispatchEvent(new CustomEvent('pc:run')); }
   function run() {
     var sc = S.scene; if (!sc) return;
     var heavy = S.method === 'ml' || S.ind.on;
@@ -306,7 +306,7 @@
       }
       if (S.sel > S.res.comps.length) S.sel = 0;
       paintOverlay(); updateResults(warn); draw(); busy(null);
-      document.dispatchEvent(new CustomEvent('pc:result'));
+      document.dispatchEvent(new CustomEvent('pc:result', { detail: { run: true } }));
     });
   }
   function renderBase() {

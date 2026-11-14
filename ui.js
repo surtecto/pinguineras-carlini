@@ -67,7 +67,35 @@
       hint.hidden = false;
     } else hint.hidden = true;
   }
-  document.addEventListener('pc:result', update);
-  document.addEventListener('pc:scene', function () { $('sumBar').textContent = 'Analizando la imagen…'; $('diag').textContent = ''; });
+  /* ---------- cada detección se anuncia: barra mientras corre, y al terminar qué cambió ---------- */
+  var RUN = { t0: 0, on: false, prev: null, timer: null }, nf0 = A.nf0;
+  function zoneTxt(sc) { var g = PE.gsd(sc), b = sc.roi && sc.roiOn && sc.roiBox ? sc.roiBox : [0, 0, sc.w, sc.h]; return (sc.roi && sc.roiOn && sc.roiBox ? 'zona analizada: ' : 'se analizó toda la imagen: ') + (g ? nf0.format((b[2] - b[0]) * g) + ' × ' + nf0.format((b[3] - b[1]) * g) + ' m' : (b[2] - b[0]) + ' × ' + (b[3] - b[1]) + ' px'); }
+  function area(c) { return PE.gsd(c.scene) ? nf0.format(c.m2) + ' m²' : nf0.format(c.px) + ' px'; }
+  document.addEventListener('pc:run', function () {
+    if (!RUN.on) { RUN.on = true; RUN.t0 = Date.now(); }
+    $('status').classList.add('running'); $('runBar').hidden = false; $('stamp').hidden = true; $('rerun').disabled = true;
+    $('sumBar').textContent = RUN.prev ? 'Detectando de nuevo…' : 'Analizando la imagen…'; $('diag').textContent = '';
+  });
+  function finish() {
+    var c = A.current(); RUN.on = false; $('status').classList.remove('running'); $('runBar').hidden = true; $('rerun').disabled = false;
+    update(); if (!c) return;
+    var p = RUN.prev, n = c.res.comps.length, st = $('stamp'), now = new Date().toLocaleTimeString('es-AR'), fresh = c.res.comps.filter(function (k) { return k.isNew; }).length, txt;
+    if (!p || p.scene !== c.scene) txt = 'Detección hecha a las ' + now + ' · ' + zoneTxt(c.scene) + '.';
+    else if (p.px === c.px && p.n === n) txt = 'Se volvió a detectar a las ' + now + ' y el resultado es el mismo (' + zoneTxt(c.scene) + ').' + (p.zone !== zoneTxt(c.scene) ? ' En la parte nueva de la zona no hay nada con color de guano.' : '');
+    else { var d = (c.px - p.px) * (c.scene.pxArea || 1); txt = 'Se volvió a detectar a las ' + now + ' · ' + zoneTxt(c.scene) + '. Antes: ' + p.area + ' en ' + p.n + (p.n === 1 ? ' grupo' : ' grupos') + '. Ahora: ' + area(c) + ' en ' + n + ' (' + (d >= 0 ? '+' : '−') + nf0.format(Math.abs(d)) + (PE.gsd(c.scene) ? ' m²' : ' px') + (fresh ? ', ' + fresh + (fresh === 1 ? ' grupo nuevo, marcado' : ' grupos nuevos, marcados') + ' en naranja' : '') + ').'; }
+    RUN.first = fresh ? c.res.comps.filter(function (k) { return k.isNew; })[0].id : 0;
+    st.textContent = txt + (RUN.first ? ' Tocar acá para ir al nuevo.' : ''); st.hidden = false; st.classList.toggle('go', !!RUN.first);
+    var box = $('status'); box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash');
+    RUN.prev = { scene: c.scene, px: c.px, n: n, area: area(c), labels: c.res.labels, zone: zoneTxt(c.scene) };
+  }
+  document.addEventListener('pc:result', function (e) {
+    if (!(e.detail && e.detail.run)) { if (!RUN.on) update(); return; }
+    var c = A.current(), p = RUN.prev;
+    if (c && p && p.scene === c.scene) { var L = c.res.labels, P = p.labels, w = c.scene.w; c.res.comps.forEach(function (k) { var hit = false; for (var y = k.y0; y <= k.y1 && !hit; y++) for (var x = k.x0; x <= k.x1; x++) { var i = y * w + x; if (L[i] === k.id && P[i]) { hit = true; break; } } k.isNew = !hit; }); A.draw(); }
+    clearTimeout(RUN.timer); RUN.timer = setTimeout(finish, Math.max(0, 550 - (Date.now() - RUN.t0)));
+  });
+  $('rerun').addEventListener('click', function () { A.schedule(0); });
+  $('stamp').addEventListener('click', function () { if (RUN.first) { A.selectComp(RUN.first, true); A.draw(); } });
+  document.addEventListener('pc:scene', function () { RUN.prev = null; $('stamp').hidden = true; });
   window.PCUI = { showView: showView, showPane: showPane };
 })();

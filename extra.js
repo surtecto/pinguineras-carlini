@@ -66,7 +66,7 @@
     if (red) { var b = sc.roiBox, px = (b[2] - b[0]) * (b[3] - b[1]) * sc.down * sc.down; $('cutFull').textContent = 'Ver la zona a resolución completa (' + nf1.format(px / 1e6) + ' MP' + (px > 9e6 ? ', se reduce a 9' : '') + ')'; }
   }
   function mode(edit, fresh) { X.edit = edit; X.fresh = !!fresh; sync(); A.draw(); document.dispatchEvent(new CustomEvent('pc:result')); }
-  $('roiEdit').addEventListener('click', function () { var sc = S.scene; if (!sc) return; if (sc.roiBox && !sc.roiBox0) sc.roiBox0 = sc.roiBox.slice(); mode(!X.edit, !sc.roi); });
+  $('roiEdit').addEventListener('click', function () { var sc = S.scene; if (!sc) return; if (sc.roiBox && !sc.roiBox0) sc.roiBox0 = sc.roiBox.slice(); var was = X.edit; mode(!X.edit, !sc.roi); if (was && sc.roiBox) A.fitView(true); }); // al terminar, encuadra la zona entera
   $('roiNew').addEventListener('click', function () { var sc = S.scene; if (!sc) return; if (sc.roiBox && !sc.roiBox0) sc.roiBox0 = sc.roiBox.slice(); mode(true, true); });
   $('roiReset').addEventListener('click', function () { var sc = S.scene; if (sc && sc.roiBox0) { setBox(sc.roiBox0, true); mode(false); } });
   $('cutFull').addEventListener('click', function () {
@@ -96,9 +96,11 @@
     else { if (a.e.l) b[0] = im[0]; if (a.e.r) b[2] = im[0]; if (a.e.t) b[1] = im[1]; if (a.e.b) b[3] = im[1]; }
     setBox(b, false);
   }
-  function up() { if (!X.act) return; X.act = null; X.fresh = false; setBox(S.scene.roiBox, true); }
+  function up() { if (!X.act) return; X.act = null; X.fresh = false; setBox(S.scene.roiBox, true); A.toast('Zona cambiada: se vuelve a detectar dentro del recuadro.'); }
   function over(ctx, P) {
-    var sc = S.scene; if (!X.edit || !sc || !sc.roiBox) return;
+    var sc = S.scene;
+    if (sc && S.res && S.ovOn) S.res.comps.forEach(function (k) { if (!k.isNew) return; var p0 = P(k.x0, k.y0), p1 = P(k.x1 + 1, k.y1 + 1), r = Math.max(14, Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) / 2 + 8); ctx.beginPath(); ctx.arc((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, r, 0, 6.2832); ctx.strokeStyle = '#ff9d2e'; ctx.lineWidth = 2.5; ctx.stroke(); });
+    if (!X.edit || !sc || !sc.roiBox) return;
     var b = sc.roiBox, a = P(Math.min(b[0], b[2]), Math.min(b[1], b[3])), c = P(Math.max(b[0], b[2]), Math.max(b[1], b[3])), mx = (a[0] + c[0]) / 2, my = (a[1] + c[1]) / 2;
     ctx.strokeStyle = '#ffe45c'; ctx.lineWidth = 2; ctx.strokeRect(a[0], a[1], c[0] - a[0], c[1] - a[1]);
     ctx.fillStyle = '#ffe45c'; ctx.strokeStyle = '#0a161b'; ctx.lineWidth = 1;
@@ -135,6 +137,7 @@
       card.appendChild(thumb(sc, cp));
       var body = document.createElement('div'), h = document.createElement('strong'), sg = signal(sc, cp, L);
       h.textContent = 'Grupo ' + cp.id + ' · ' + (g ? nf0.format(cp.area * sc.pxArea) + ' m²' : nf0.format(cp.area) + ' px'); body.appendChild(h);
+      if (cp.isNew) { var nw = document.createElement('span'); nw.className = 'sigtag new'; nw.textContent = 'nuevo'; h.appendChild(nw); }
       if (sg) { var lvl = sg.ri >= 7 ? ['fuerte', 'ok'] : sg.ri >= 4.5 ? ['media', 'mid'] : ['débil', 'low'], t = document.createElement('span'); t.className = 'sigtag ' + lvl[1]; t.textContent = 'señal ' + lvl[0]; h.appendChild(t); }
       var kv = document.createElement('div'); kv.className = 'kvs';
       if (g) kv.appendChild(chip('parejas', '≈ ' + nf0.format(cp.area * sc.pxArea * c.dens.mid)));
