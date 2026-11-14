@@ -75,7 +75,7 @@
     throw new Error(last && last.name === 'AbortError' ? 'El servidor de imágenes tardó demasiado. Volver a intentar.' : (last && last.message) || 'lectura fallida');
   }
   async function readWin(url, W, outW, outH, method, signal) {
-    var tiff = await GeoTIFF.fromUrl(url, { blockSize: 524288, cacheSize: 40 }, signal), img = await tiff.getImage(), o = img.getOrigin(), r = img.getResolution(), ry = Math.abs(r[1]);
+    var tiff = await GeoTIFF.fromUrl(url, {}, signal), img = await tiff.getImage(), o = img.getOrigin(), r = img.getResolution(), ry = Math.abs(r[1]);
     var px0 = Math.round((W.x0 - o[0]) / r[0]), px1 = Math.round((W.x1 - o[0]) / r[0]), py0 = Math.round((o[1] - W.y1) / ry), py1 = Math.round((o[1] - W.y0) / ry);
     if (px0 < 0 || py0 < 0 || px1 > img.getWidth() || py1 > img.getHeight()) throw new Error('fuera');
     var opt = { window: [px0, py0, px1, py1], interleave: false, signal: signal };
@@ -115,7 +115,7 @@
       await A.ensureGeoTIFF();
       var w = (W.x1 - W.x0) / 10, h = (W.y1 - W.y0) / 10, raw = [];
       var urls = [[it.a.b], [it.a.g], [it.a.r], [it.a.n], [it.a.s, w, h, 'bilinear'], [it.a.scl, w, h, 'nearest']];
-      for (var k = 0; k < urls.length; k++) { A.busy('Leyendo Sentinel-2 del ' + it.fecha + ': banda ' + (k + 1) + ' de 6…'); raw.push(await readWinTry(urls[k][0], W, urls[k][1], urls[k][2], urls[k][3], 45000, 3)); }
+      for (var k = 0; k < urls.length; k++) { A.busy('Leyendo Sentinel-2 del ' + it.fecha + ': banda ' + (k + 1) + ' de 6…'); raw.push(await readWinTry(urls[k][0], W, urls[k][1], urls[k][2], urls[k][3], 120000, 2)); }
       var sub = it.pb >= '04.00' && !it.off ? 1000 : 0, bands = raw.slice(0, 5).map(function (a) { var o = new Float32Array(a.length); for (var i = 0; i < a.length; i++) { var v = a[i]; o[i] = v === 0 ? 0 : (v > sub ? v - sub : 1); } return o; });
       var e = { fecha: it.fecha, nubes: it.nubes || 0 };
       var sc = await makeScene({ w: w, h: h, bands: bands, scl: raw[5], ox: W.x0, oy: W.y1, name: 'Sentinel-2 ' + it.fecha + ' · ' + s.n, date: it.fecha, note: note(e, 'Leída en vivo del archivo abierto. ') });
