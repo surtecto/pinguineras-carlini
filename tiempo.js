@@ -29,44 +29,73 @@
   }
   function mainSp(site) { var l = latest(site), best = null; Object.keys(l).forEach(function (k) { if (!best || l[k][2] > l[best][2]) best = k; }); return [best, l[best][2]]; }
 
-  /* ---------- mapa del sector ---------- */
-  var bb = R.bbox, COS = Math.cos(62.2 * Math.PI / 180);
-  function drawMap() {
-    var c = setup($('regMap'), (bb[3] - bb[1]) / ((bb[2] - bb[0]) * COS)); if (!c) return;
-    var g = c.g, k = c.w / ((bb[2] - bb[0]) * COS);
-    function P(lon, lat) { return [(lon - bb[0]) * COS * k, (bb[3] - lat) * k]; }
-    var ink = css('--ink'), muted = css('--muted'), line = css('--line'), paper = css('--paper');
-    g.fillStyle = css('--surface'); g.fillRect(0, 0, c.w, c.h);
-    g.strokeStyle = line; g.lineWidth = 1; g.fillStyle = muted; g.font = '10px "IBM Plex Mono", monospace';
-    for (var lo = -59.5; lo <= -57.4; lo += 0.5) { var p = P(lo, bb[3]); g.beginPath(); g.moveTo(p[0], 0); g.lineTo(p[0], c.h); g.stroke(); g.fillText(Math.abs(lo).toFixed(1).replace('.', ',') + '° O', p[0] + 3, c.h - 5); }
-    for (var la = -62.4; la <= -61.85; la += 0.2) { var q = P(bb[0], la); g.beginPath(); g.moveTo(0, q[1]); g.lineTo(c.w, q[1]); g.stroke(); g.fillText(Math.abs(la).toFixed(1).replace('.', ',') + '° S', 4, q[1] - 3); }
-    g.fillStyle = paper; g.strokeStyle = muted; g.lineWidth = 1;
-    R.coast.forEach(function (ring) { g.beginPath(); ring.forEach(function (pt, i) { var p2 = P(pt[0], pt[1]); if (i) g.lineTo(p2[0], p2[1]); else g.moveTo(p2[0], p2[1]); }); g.closePath(); g.fill(); g.stroke(); });
-    T.mapPts = [];
+  /* ---------- mapa del sector: Leaflet con base satelital ---------- */
+  var bb = R.bbox, MAP = null, MK = {}, RING = null, COAST = null, fitted = false;
+  var ACC = { 1: '±5 %', 2: '±10 %', 3: '±15 %', 4: '±25 a 50 %', 5: 'orden de magnitud' };
+  function radius(s) { return 4 + 2.1 * Math.log10(1 + mainSp(s)[1]); }
+  function gmaps(la, lo, m) { return 'https://www.google.com/maps/@' + la.toFixed(5) + ',' + lo.toFixed(5) + ',' + (m || 1500) + 'm/data=!3m1!1e3'; }
+  function initMap() {
+    if (MAP || !window.L) return;
+    MAP = L.map('regMap', { minZoom: 6, maxZoom: 17, zoomSnap: 0.5, attributionControl: true });
+    var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 13, maxZoom: 17, attribution: 'Imagen: Esri, Earthstar Geographics' });
+    var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxNativeZoom: 18, maxZoom: 17, attribution: '© colaboradores de OpenStreetMap' });
+    MAP.setView([(bb[1] + bb[3]) / 2, (bb[0] + bb[2]) / 2], 9);
+    var bases = { sat: sat, osm: osm }; sat.addTo(MAP);
+    COAST = L.polyline(R.coast.map(function (ring) { return ring.map(function (p) { return [p[1], p[0]]; }); }), { color: '#9fd3e0', weight: 1, opacity: 0.7, interactive: false });
+    function coast() { var on = MAP.getZoom() <= 9.5 || tileFail; if (on && !MAP.hasLayer(COAST)) COAST.addTo(MAP); else if (!on && MAP.hasLayer(COAST)) MAP.removeLayer(COAST); }
+    var tileFail = false; sat.on('tileerror', function () { tileFail = true; coast(); }); sat.on('tileload', function () { if (tileFail) { tileFail = false; coast(); } });
+    MAP.on('zoomend', coast);
+    L.control.scale({ imperial: false }).addTo(MAP);
     R.sites.slice().sort(function (a, b) { return mainSp(b)[1] - mainSp(a)[1]; }).forEach(function (s) {
-      var m = mainSp(s), p3 = P(s.lo, s.la), r = 2.5 + 1.7 * Math.log10(1 + m[1]);
-      g.beginPath(); g.arc(p3[0], p3[1], r, 0, 6.2832); g.globalAlpha = 0.78; g.fillStyle = css(SP[m[0]].v); g.fill(); g.globalAlpha = 1; g.lineWidth = 1; g.strokeStyle = css('--surface'); g.stroke();
-      T.mapPts.push({ id: s.id, x: p3[0], y: p3[1], r: r });
+      var m = mainSp(s), mk = L.circleMarker([s.la, s.lo], { radius: radius(s), color: '#fff', weight: 1, fillColor: css(SP[m[0]].v), fillOpacity: 0.85 }).addTo(MAP);
+      mk.bindTooltip(s.n + ' · ' + nf0.format(m[1]) + ' ' + TY[latest(s)[m[0]][1]] + ' de ' + SP[m[0]].n.toLowerCase(), { direction: 'top' });
+      mk.on('click', function () { selectSite(s.id); }); MK[s.id] = mk;
     });
-    var base = P(-58.667, -62.238); g.fillStyle = ink; g.fillRect(base[0] - 3.5, base[1] - 3.5, 7, 7);
-    g.font = '600 11px "IBM Plex Sans", sans-serif'; g.fillStyle = ink; g.fillText('Base Carlini', base[0] + 7, base[1] - 5);
-    var sel = byId[T.site], ps = P(sel.lo, sel.la);
-    g.beginPath(); g.arc(ps[0], ps[1], 2.5 + 1.7 * Math.log10(1 + mainSp(sel)[1]) + 4, 0, 6.2832); g.lineWidth = 2; g.strokeStyle = ink; g.stroke();
-    var tw = g.measureText(sel.n).width, tx = Math.min(c.w - tw - 6, Math.max(4, ps[0] + 12)), ty = ps[1] + 16 > c.h - 8 ? ps[1] - 12 : ps[1] + 18;
-    g.fillStyle = css('--surface'); g.globalAlpha = 0.85; g.fillRect(tx - 3, ty - 11, tw + 6, 15); g.globalAlpha = 1; g.fillStyle = ink; g.fillText(sel.n, tx, ty);
+    L.marker([-62.2379, -58.6672], { icon: L.divIcon({ className: 'basemk', html: '<i></i><span>Base Carlini</span>', iconSize: [8, 8] }), interactive: false }).addTo(MAP);
+    RING = L.circleMarker([0, 0], { radius: 12, color: '#ffe45c', weight: 2.5, fill: false, interactive: false }).addTo(MAP);
+    Array.prototype.forEach.call($('baseSel').querySelectorAll('button'), function (b) {
+      b.addEventListener('click', function () {
+        Array.prototype.forEach.call($('baseSel').querySelectorAll('button'), function (o) { o.setAttribute('aria-selected', String(o === b)); });
+        Object.keys(bases).forEach(function (k) { if (k === b.dataset.base) bases[k].addTo(MAP); else MAP.removeLayer(bases[k]); });
+      });
+    });
+    var sel = $('siteSel');
+    R.sites.slice().sort(function (a, b) { return a.n.localeCompare(b.n); }).forEach(function (s) { sel.add(new Option(s.n, s.id)); });
+    sel.addEventListener('change', function () { selectSite(sel.value, true); });
   }
-  $('regMap').addEventListener('click', function (e) {
-    var r = this.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, best = null, bd = 1e9;
-    T.mapPts.forEach(function (p) { var d = Math.hypot(p.x - x, p.y - y) - p.r; if (d < bd) { bd = d; best = p; } });
-    if (best && bd < 12) selectSite(best.id);
-  });
-  function selectSite(id) { T.site = id; drawMap(); siteInfo(); drawChart(); renderRecs(); }
+  function drawMap() {
+    initMap(); if (!MAP) return;
+    var box = $('regMap');
+    if (!box.clientWidth) return;
+    MAP.invalidateSize();
+    if (!fitted) { fitted = true; MAP.fitBounds([[bb[1], bb[0]], [bb[3], bb[2]]]); }
+    var s = byId[T.site]; RING.setLatLng([s.la, s.lo]); RING.setRadius(radius(s) + 5); $('siteSel').value = T.site;
+  }
+  function selectSite(id, fly) {
+    T.site = id; T.span = null; drawMap(); siteInfo(); drawChart(); renderRecs();
+    if (fly && MAP) { var s = byId[id]; MAP.setView([s.la, s.lo], Math.max(MAP.getZoom(), 11.5)); }
+  }
 
   function el(tag, txt, cls) { var e = document.createElement(tag); if (txt !== undefined) e.textContent = txt; if (cls) e.className = cls; return e; }
+  function link(txt, href) { var a = el('a', txt); a.href = href; a.target = '_blank'; a.rel = 'noopener'; return a; }
+  function refNode(r, extra) { // cita completa con enlace
+    var li = el('li');
+    li.appendChild(document.createTextNode((r.a || r.s) + (r.y ? ' (' + r.y + '). ' : '. ')));
+    if (r.t) li.appendChild(el('i', r.t)); if (r.w) li.appendChild(document.createTextNode('. ' + r.w));
+    li.appendChild(document.createTextNode('. '));
+    if (r.u) li.appendChild(link(/doi\.org/.test(r.u) ? r.u.replace('https://doi.org/', 'doi:') : 'enlace', r.u)); else li.appendChild(el('span', 'sin enlace en la base de datos', 'muted'));
+    if (extra) li.appendChild(el('span', ' · ' + extra, 'muted'));
+    return li;
+  }
+  function allCounts(s) { var out = []; Object.keys(s.sp).forEach(function (k) { s.sp[k].forEach(function (o) { out.push([k, o]); }); }); return out; }
   function siteInfo() {
-    var s = byId[T.site], box = $('siteInfo'), l = latest(s); box.innerHTML = '';
-    box.appendChild(el('h3', s.n));
-    box.appendChild(el('p', Math.abs(s.la).toFixed(3).replace('.', ',') + '° S  ' + Math.abs(s.lo).toFixed(3).replace('.', ',') + '° O · código MAPPPD ' + s.id, 'coord'));
+    var s = byId[T.site], box = $('siteInfo'), l = latest(s), all = allCounts(s); box.innerHTML = '';
+    box.appendChild(el('h2', s.n));
+    var p = el('p', Math.abs(s.la).toFixed(3).replace('.', ',') + '° S  ' + Math.abs(s.lo).toFixed(3).replace('.', ',') + '° O · código MAPPPD ' + s.id + ' · ', 'coord');
+    p.appendChild(link('ver en Google Maps', gmaps(s.la, s.lo, 2500))); box.appendChild(p);
+    var ys = all.map(function (c) { return c[1][0]; }), refs = {}; all.forEach(function (c) { refs[c[1][4]] = 1; });
+    var newest = all.slice().sort(function (a, b) { return b[1][0] - a[1][0]; })[0], nr = R.refs[newest[1][4]];
+    box.appendChild(el('p', nf0.format(all.length) + (all.length === 1 ? ' conteo publicado' : ' conteos publicados') + ', de ' + PE.seasonLabel(Math.min.apply(null, ys)) + ' a ' + PE.seasonLabel(Math.max.apply(null, ys)) + ', tomados de ' + Object.keys(refs).length + (Object.keys(refs).length === 1 ? ' fuente' : ' fuentes') + '. El más reciente es de ' + nr.s + '. Abajo figura cada conteo con quién lo hizo y cómo.'));
     var t = el('table'), hd = t.createTHead().insertRow();
     ['Especie', 'Último conteo', 'Temporada', 'Primer registro', 'Cambio en nidos'].forEach(function (h) { hd.appendChild(el('th', h)); });
     var tb = t.createTBody();
@@ -76,30 +105,67 @@
       [SP[k].n, nf0.format(last[2]) + ' ' + TY[last[1]], PE.seasonLabel(last[0]), PE.seasonLabel(o[0][0]),
         chg === null ? '—' : (chg > 0 ? '+' : '') + nf0.format(chg) + ' % desde ' + PE.seasonLabel(nests[0][0])].forEach(function (v) { row.insertCell().textContent = v; });
     });
-    box.appendChild(t);
-    if (T.site === 'STRA') box.appendChild(el('p', 'Los conteos de Adelia de 2007/08 a 2012/13 figuran así en la base de datos; el plan de gestión de la ZAEP 132 cita unas 3.000 parejas. Conviene confirmar con el Instituto Antártico Argentino si corresponden a toda la colonia o a los grupos monitoreados.', 'hint'));
+    var tw = el('div', undefined, 'tablewrap'); tw.appendChild(t); box.appendChild(tw);
+    if (T.site === 'STRA') box.appendChild(el('p', 'Los censos de terreno de Punta Stranger son del Instituto Antártico Argentino. Los conteos de Adelia de 2007/08 a 2012/13 (777 a 1.083 nidos, Juáres et al. 2015) figuran así en la base de datos; el plan de gestión de la ZAEP 132 cita unas 3.000 parejas. Conviene confirmar con el Instituto si corresponden a toda la colonia o a los grupos monitoreados.', 'hint'));
+    // cada conteo
+    var cb = $('countTbl').tBodies[0]; cb.innerHTML = '';
+    all.sort(function (a, b) { return b[1][0] - a[1][0] || a[0].localeCompare(b[0]); }).forEach(function (c) {
+      var o = c[1], r = R.refs[o[4]], row = cb.insertRow();
+      [PE.seasonLabel(o[0]), SP[c[0]].n, nf0.format(o[2]), TY[o[1]], ACC[o[3]] || '—', o[5] >= 0 ? R.vant[o[5]] : 'sin dato'].forEach(function (v) { row.insertCell().textContent = v; });
+      var cell = row.insertCell(); if (r.u) cell.appendChild(link(r.s, r.u)); else cell.textContent = r.s; cell.title = (r.a || '') + (r.t ? '. ' + r.t : '');
+    });
+    // quién investigó
+    var ul = $('siteRefs'); ul.innerHTML = '';
+    Object.keys(refs).map(Number).sort(function (a, b) { return (R.refs[b].y || 0) - (R.refs[a].y || 0); }).forEach(function (i) {
+      var mine = all.filter(function (c) { return c[1][4] === i; }), y = mine.map(function (c) { return c[1][0]; });
+      ul.appendChild(refNode(R.refs[i], 'aporta ' + mine.length + (mine.length === 1 ? ' conteo' : ' conteos') + ' (' + PE.seasonLabel(Math.min.apply(null, y)) + (mine.length > 1 ? ' a ' + PE.seasonLabel(Math.max.apply(null, y)) : '') + ')'));
+    });
   }
+  (function allRefs() { // pestaña Fuentes
+    var ol = $('allRefs'); if (!ol) return;
+    var used = {}; R.sites.forEach(function (s) { allCounts(s).forEach(function (c) { (used[c[1][4]] = used[c[1][4]] || {})[s.n] = 1; }); });
+    var ids = Object.keys(used).map(Number).sort(function (a, b) { return (R.refs[a].a || R.refs[a].s).localeCompare(R.refs[b].a || R.refs[b].s); });
+    ids.forEach(function (i) { var n = Object.keys(used[i]); ol.appendChild(refNode(R.refs[i], n.length <= 3 ? n.join(', ') : n.length + ' colonias')); });
+    var rc = $('refCount'); if (rc) rc.textContent = ids.length;
+  })();
 
-  /* ---------- gráfico de la serie ---------- */
+  /* ---------- gráfico de la serie, con zoom en el tiempo ---------- */
   function siteRecs() { return T.recs.filter(function (r) { return r.site === T.site && r.pairs; }); }
+  T.span = null; T.hide = {}; T.log = false; T.ax = null;
+  function fullSpan() {
+    var s = byId[T.site], x0 = 1e9;
+    Object.keys(s.sp).forEach(function (k) { if (k === 'MCPE') return; s.sp[k].forEach(function (o) { if (o[0] < x0) x0 = o[0]; }); });
+    siteRecs().forEach(function (r) { if (r.season < x0) x0 = r.season; });
+    if (x0 > NOW) x0 = NOW - 10; return [x0 - 1, NOW];
+  }
   function drawChart() {
     var c = setup($('serie'), 0.5); if (!c) return;
     var g = c.g, s = byId[T.site], recs = siteRecs(), L = 56, Rm = 14, Tp = 16, B = 30;
-    var x0 = 1e9, x1 = NOW, ymax = 1;
-    Object.keys(s.sp).forEach(function (k) { if (k === 'MCPE') return; s.sp[k].forEach(function (o) { if (o[0] < x0) x0 = o[0]; if (o[2] > ymax) ymax = o[2]; }); });
-    recs.forEach(function (r) { if (r.season < x0) x0 = r.season; if (r.pairs[2] > ymax) ymax = r.pairs[2]; });
-    if (x0 > x1) x0 = x1 - 10; x0 -= 1;
-    var mag = Math.pow(10, Math.floor(Math.log10(ymax))), step = ymax / mag > 5 ? mag : ymax / mag > 2 ? mag / 2 : mag / 5; ymax = Math.ceil(ymax / step) * step;
-    function X(v) { return L + (v - x0) / (x1 - x0) * (c.w - L - Rm); } function Y(v) { return c.h - B - v / ymax * (c.h - B - Tp); }
+    var sp = T.span || fullSpan(), x0 = sp[0], x1 = sp[1], ymax = 1, ymin = 1e9;
+    function seen(v) { return v >= x0 && v <= x1; }
+    Object.keys(s.sp).forEach(function (k) { if (k === 'MCPE' || T.hide[k]) return; s.sp[k].forEach(function (o) { if (seen(o[0])) { if (o[2] > ymax) ymax = o[2]; if (o[2] < ymin) ymin = o[2]; } }); });
+    recs.forEach(function (r) { if (seen(r.season)) { if (r.pairs[2] > ymax) ymax = r.pairs[2]; if (r.pairs[0] < ymin) ymin = r.pairs[0]; } });
+    var X = function (v) { return L + (v - x0) / (x1 - x0) * (c.w - L - Rm); }, Y, ticks = [];
+    if (T.log) {
+      var l0 = Math.floor(Math.log10(Math.max(1, ymin))), l1 = Math.ceil(Math.log10(ymax)); if (l1 <= l0) l1 = l0 + 1;
+      Y = function (v) { return c.h - B - (Math.log10(Math.max(1, v)) - l0) / (l1 - l0) * (c.h - B - Tp); };
+      for (var e = l0; e <= l1; e++) { ticks.push(Math.pow(10, e)); if (e < l1) ticks.push(3 * Math.pow(10, e)); }
+    } else {
+      var mag = Math.pow(10, Math.floor(Math.log10(ymax))), step = ymax / mag > 5 ? mag : ymax / mag > 2 ? mag / 2 : mag / 5; ymax = Math.ceil(ymax / step) * step;
+      Y = function (v) { return c.h - B - v / ymax * (c.h - B - Tp); };
+      for (var v = 0; v <= ymax + 1e-9; v += step) ticks.push(v);
+    }
+    T.ax = { L: L, R: c.w - Rm, x0: x0, x1: x1 };
     var muted = css('--muted'), line = css('--line'), ink = css('--ink');
     g.font = '10.5px "IBM Plex Mono", monospace'; g.fillStyle = muted; g.strokeStyle = line; g.lineWidth = 1; g.textBaseline = 'middle'; g.textAlign = 'right';
-    for (var v = 0; v <= ymax + 1e-9; v += step) { g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(c.w - Rm, Y(v)); g.stroke(); g.fillText(nf0.format(v), L - 6, Y(v)); }
+    ticks.forEach(function (tv) { g.beginPath(); g.moveTo(L, Y(tv)); g.lineTo(c.w - Rm, Y(tv)); g.stroke(); g.fillText(nf0.format(tv), L - 6, Y(tv)); });
     g.textAlign = 'center'; g.textBaseline = 'top';
-    var xs = (x1 - x0) > 40 ? 10 : (x1 - x0) > 16 ? 5 : 2;
+    var xs = (x1 - x0) > 40 ? 10 : (x1 - x0) > 16 ? 5 : (x1 - x0) > 7 ? 2 : 1;
     for (var yr = Math.ceil(x0 / xs) * xs; yr <= x1; yr += xs) { g.beginPath(); g.moveTo(X(yr), c.h - B); g.lineTo(X(yr), c.h - B + 4); g.strokeStyle = muted; g.stroke(); g.fillText(PE.seasonLabel(yr), X(yr), c.h - B + 7); }
     T.pts = [];
+    g.save(); g.beginPath(); g.rect(L - 6, 0, c.w - L - Rm + 12, c.h - B + 1); g.clip();
     Object.keys(s.sp).forEach(function (k) {
-      if (k === 'MCPE') return;
+      if (k === 'MCPE' || T.hide[k]) return;
       var col = css(SP[k].v), o = s.sp[k], nests = o.filter(function (r) { return r[1] === 'n'; });
       g.strokeStyle = col; g.lineWidth = 1.75; g.beginPath();
       nests.forEach(function (r, i) { if (i) g.lineTo(X(r[0]), Y(r[2])); else g.moveTo(X(r[0]), Y(r[2])); }); g.stroke();
@@ -108,7 +174,7 @@
         g.beginPath();
         if (r[1] === 'a') { g.moveTo(px, py - 4.5); g.lineTo(px + 4, py + 3.5); g.lineTo(px - 4, py + 3.5); g.closePath(); } else g.arc(px, py, 3.2, 0, 6.2832);
         if (r[1] === 'n') { g.fillStyle = col; g.fill(); } else { g.fillStyle = css('--surface'); g.fill(); g.lineWidth = 1.5; g.strokeStyle = col; g.stroke(); }
-        T.pts.push({ x: px, y: py, t: SP[k].n + ' · ' + PE.seasonLabel(r[0]) + ' · ' + nf0.format(r[2]) + ' ' + TY[r[1]] });
+        if (seen(r[0])) T.pts.push({ x: px, y: py, t: SP[k].n + ' · ' + PE.seasonLabel(r[0]) + ' · ' + nf0.format(r[2]) + ' ' + TY[r[1]] + ' · ' + R.refs[r[4]].s + (r[5] >= 0 ? ' · ' + R.vant[r[5]] : '') });
       });
     });
     var dc = css('--warnc');
@@ -117,23 +183,45 @@
       g.strokeStyle = dc; g.lineWidth = 1.5; g.beginPath(); g.moveTo(px, Y(r.pairs[0])); g.lineTo(px, Y(r.pairs[2])); g.stroke();
       g.beginPath(); g.moveTo(px, py - 5.5); g.lineTo(px + 5.5, py); g.lineTo(px, py + 5.5); g.lineTo(px - 5.5, py); g.closePath();
       g.fillStyle = r.synth ? css('--surface') : dc; g.fill(); g.stroke();
-      T.pts.push({ x: px, y: py, t: (r.synth ? 'Detección de escena sintética' : 'Detección en imagen') + ' · ' + r.date + ' · ' + nf0.format(r.pairs[1]) + ' parejas estimadas (' + nf0.format(r.pairs[0]) + ' a ' + nf0.format(r.pairs[2]) + ')' });
+      if (seen(r.season)) T.pts.push({ x: px, y: py, t: (r.synth ? 'Detección de escena sintética' : 'Detección propia en imagen') + ' · ' + r.date + ' · ' + nf0.format(r.pairs[1]) + ' parejas estimadas (' + nf0.format(r.pairs[0]) + ' a ' + nf0.format(r.pairs[2]) + ')' });
     });
-    g.fillStyle = ink; g.font = '600 12px "IBM Plex Sans", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'top'; g.fillText(s.n + ': conteos por temporada', L, 0);
+    g.restore();
+    g.fillStyle = ink; g.font = '600 12px "IBM Plex Sans", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'top'; g.fillText(s.n + ': ' + PE.seasonLabel(Math.ceil(x0)) + ' a ' + PE.seasonLabel(Math.floor(x1)), L, 0);
     var lg = $('legend'); lg.innerHTML = '';
-    Object.keys(s.sp).forEach(function (k) { if (k === 'MCPE') return; var sp = el('span'), i = el('i'); i.style.background = css(SP[k].v); sp.appendChild(i); sp.appendChild(document.createTextNode(SP[k].n)); lg.appendChild(sp); });
-    [['', 'Nidos (línea)'], ['hollow', 'Pichones o adultos'], ['dia', 'Detección en imagen, con su rango']].forEach(function (d) {
-      var sp = el('span'), i = el('i', undefined, d[0]); i.style.background = d[0] === 'dia' ? dc : muted; i.style.color = muted; sp.appendChild(i); sp.appendChild(document.createTextNode(d[1])); lg.appendChild(sp);
+    Object.keys(s.sp).forEach(function (k) {
+      if (k === 'MCPE') return; var b = el('button', undefined, 'lgbtn' + (T.hide[k] ? ' off' : '')), i = el('i'); b.type = 'button'; i.style.background = css(SP[k].v); b.appendChild(i); b.appendChild(document.createTextNode(SP[k].n));
+      b.addEventListener('click', function () { T.hide[k] = !T.hide[k]; drawChart(); }); lg.appendChild(b);
+    });
+    [['', 'Nidos (línea)'], ['hollow', 'Pichones o adultos'], ['dia', 'Detección propia en imagen, con su rango']].forEach(function (d) {
+      var sp2 = el('span'), i = el('i', undefined, d[0]); i.style.background = d[0] === 'dia' ? dc : muted; i.style.color = muted; sp2.appendChild(i); sp2.appendChild(document.createTextNode(d[1])); lg.appendChild(sp2);
     });
   }
-  $('serie').addEventListener('pointermove', function (e) {
-    var r = this.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, best = null, bd = 16;
-    T.pts.forEach(function (p) { var d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = p; } });
-    var tip = $('tip'); if (!best) { tip.hidden = true; return; }
-    tip.textContent = best.t; tip.hidden = false;
-    tip.style.left = Math.max(4, Math.min(r.width - 244, best.x + 10)) + 'px'; tip.style.top = Math.max(4, best.y - 34) + 'px';
-  });
-  $('serie').addEventListener('pointerleave', function () { $('tip').hidden = true; });
+  (function chartZoom() {
+    var cvs = $('serie'), dragX = null;
+    function yearAt(px) { var a = T.ax; return a.x0 + (px - a.L) / (a.R - a.L) * (a.x1 - a.x0); }
+    function clampSpan(a, b) { var f = fullSpan(), w = Math.max(3, Math.min(f[1] - f[0], b - a)); if (a < f[0]) a = f[0]; if (a + w > f[1]) a = f[1] - w; T.span = w >= f[1] - f[0] - 0.01 ? null : [a, a + w]; drawChart(); }
+    cvs.addEventListener('wheel', function (e) {
+      if (!T.ax) return; e.preventDefault();
+      var r = cvs.getBoundingClientRect(), yc = yearAt(e.clientX - r.left), f = e.deltaY > 0 ? 1.25 : 0.8, a = T.ax;
+      clampSpan(yc - (yc - a.x0) * f, yc - (yc - a.x0) * f + (a.x1 - a.x0) * f);
+    }, { passive: false });
+    cvs.addEventListener('pointerdown', function (e) { if (!T.ax) return; cvs.setPointerCapture(e.pointerId); dragX = { x: e.clientX, x0: T.ax.x0, x1: T.ax.x1 }; });
+    cvs.addEventListener('pointermove', function (e) {
+      var r = cvs.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+      if (dragX) { var dy = (e.clientX - dragX.x) / (T.ax.R - T.ax.L) * (dragX.x1 - dragX.x0); if (Math.abs(e.clientX - dragX.x) > 3) clampSpan(dragX.x0 - dy, dragX.x1 - dy); $('tip').hidden = true; return; }
+      var best = null, bd = 16; T.pts.forEach(function (p) { var d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = p; } });
+      var tip = $('tip'); if (!best) { tip.hidden = true; return; }
+      tip.textContent = best.t; tip.hidden = false;
+      tip.style.left = Math.max(4, Math.min(r.width - 264, best.x + 10)) + 'px'; tip.style.top = Math.max(4, best.y - 44) + 'px';
+    });
+    function end() { dragX = null; } cvs.addEventListener('pointerup', end); cvs.addEventListener('pointercancel', end);
+    cvs.addEventListener('pointerleave', function () { $('tip').hidden = true; });
+    cvs.addEventListener('dblclick', function () { T.span = null; drawChart(); });
+    Array.prototype.forEach.call(document.querySelectorAll('.charttools [data-span]'), function (b) {
+      b.addEventListener('click', function () { var f = fullSpan(); T.span = b.dataset.span === 'all' ? null : [Math.max(f[0], +b.dataset.span - 1), f[1]]; drawChart(); });
+    });
+    $('chartLog').addEventListener('change', function () { T.log = this.checked; drawChart(); });
+  })();
 
   /* ---------- calendario del ciclo ---------- */
   (function pheno() {
@@ -236,7 +324,7 @@
   if (window.PC_WEB && !T.recs.length) fetch('datos/serie_potter.json').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
     if (d && Array.isArray(d.detecciones) && !T.recs.length) { T.recs = d.detecciones; renderRecs(); drawChart(); }
   }).catch(function () {});
-  if (window.ResizeObserver) new ResizeObserver(all).observe($('regMap').parentElement); else window.addEventListener('resize', all);
+  if (window.ResizeObserver) new ResizeObserver(all).observe($('regMap')); window.addEventListener('resize', all);
   if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', all);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(all);
   var sc0 = window.__app && window.__app.S.scene; if (sc0) { $('recDate').value = sc0.date || ''; }

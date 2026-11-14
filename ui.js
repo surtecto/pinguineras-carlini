@@ -8,7 +8,7 @@
   /* ---------- pestañas ---------- */
   function showView(v) {
     Array.prototype.forEach.call($('mainTabs').querySelectorAll('button'), function (b) { b.setAttribute('aria-selected', String(b.dataset.view === v)); });
-    ['detectar', 'censos', 'serie', 'ayuda'].forEach(function (k) { $('v-' + k).hidden = k !== v; });
+    ['detectar', 'censos', 'serie', 'ayuda', 'fuentes'].forEach(function (k) { $('v-' + k).hidden = k !== v; });
     try { if (v !== 'detectar') location.hash = v; else history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* sin historial */ }
     requestAnimationFrame(function () { window.dispatchEvent(new Event('resize')); });
   }
@@ -21,7 +21,7 @@
   $('goSerie').addEventListener('click', function () { showView('serie'); var d = $('recDate'); if (!d.value) d.focus(); else $('recAdd').focus(); });
   $('mML').addEventListener('click', function () { showPane('deteccion'); });
   $('toolMeasure').addEventListener('click', function () { setTimeout(update, 0); });
-  var h0 = (location.hash || '').slice(1); if (['censos', 'serie', 'ayuda'].indexOf(h0) >= 0) showView(h0);
+  var h0 = (location.hash || '').slice(1); if (['censos', 'serie', 'ayuda', 'fuentes'].indexOf(h0) >= 0) showView(h0);
 
   /* ---------- franja de estado ---------- */
   function cover(sc) { // fracción de tierra con nieve y con nubes dentro de la zona analizada
@@ -54,9 +54,13 @@
       msg = 'Detección automática lista: lo celeste tiene color de guano' + (sc.roi && sc.roiOn ? ', dentro del recuadro de trazos' : '') + '. Tocar una mancha muestra sus datos; en «Detección» se ajusta si sobra o falta.';
       if (sc.synthetic) msg = 'Imagen inventada para practicar. ' + msg;
     }
+    if (sc.src && sc.down > 1.2) msg = 'Vista general: la imagen original se redujo ' + Math.round(sc.down) + ' veces para entrar en pantalla. Para trabajar con todo el detalle, en «Detección» marcar una zona y pulsar «Ver la zona a resolución completa». ' + (n ? '' : '');
+    else if (sc.parent) msg = 'Recorte a resolución completa de la zona marcada. ' + msg + ' «Volver a la imagen completa» está en «Detección».';
     diag.textContent = msg;
     hint.innerHTML = '';
-    if ($('toolMeasure').getAttribute('aria-pressed') === 'true') { hint.textContent = 'Medir: tocar los dos extremos de una distancia conocida.'; hint.hidden = false; }
+    var px = window.PCX && window.PCX.state;
+    if (px && px.edit) { hint.textContent = px.fresh ? 'Dibujar la zona: arrastrar sobre la imagen de una esquina a la opuesta.' : 'Editando la zona: arrastrar los cuadraditos para cambiar el tamaño, o el interior para moverla. Fuera del recuadro se mueve la imagen.'; hint.hidden = false; }
+    else if ($('toolMeasure').getAttribute('aria-pressed') === 'true') { hint.textContent = 'Medir: tocar los dos extremos de una distancia conocida.'; hint.hidden = false; }
     else if (ml) {
       var dot = document.createElement('i'); dot.style.background = c.cls === 'guano' ? '#ff5fa2' : '#ffd23f'; hint.appendChild(dot);
       hint.appendChild(document.createTextNode(c.cls === 'guano' ? 'Marcando guano: tocar una mancha rosada o rojiza.' : 'Marcando lo que no es guano: tocar nieve, roca, agua o lo pintado de más.'));

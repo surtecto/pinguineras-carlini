@@ -62,20 +62,37 @@
     });
   }
 
-  async function loadTiff(file) {
+  /* Lee una imagen enorme sin pirámides por franjas horizontales y la reduce sobre la marcha: nunca hay más de unos 16 MP en memoria. */
+  async function readBanded(im, win, t, n) {
+    var W = win[2] - win[0], H = win[3] - win[1], f = H / t.h, ro = Math.max(1, Math.floor(16e6 / (W * f))), out = [];
+    for (var b = 0; b < n; b++) out.push(new Float32Array(t.w * t.h));
+    for (var oy = 0; oy < t.h; oy += ro) {
+      var o1 = Math.min(t.h, oy + ro), y0 = win[1] + Math.round(oy * f), y1 = win[1] + Math.max(Math.round(oy * f) + 1, Math.round(o1 * f));
+      var part = await im.readRasters({ window: [win[0], y0, win[2], Math.min(win[3], y1)], width: t.w, height: o1 - oy, resampleMethod: 'nearest', interleave: false });
+      for (b = 0; b < n; b++) out[b].set(part[b], oy * t.w);
+      busy('Armando la vista general de una imagen de ' + nf0.format(W * H / 1e6) + ' megapíxeles… ' + Math.round(100 * o1 / t.h) + ' %');
+      await new Promise(function (r) { setTimeout(r, 0); });
+    }
+    return out;
+  }
+  async function loadTiff(file, cut) {
     await ensureGeoTIFF();
-    var tiff = await GeoTIFF.fromBlob(file), main = await tiff.getImage(0);
-    var W = main.getWidth(), H = main.getHeight(), n = main.getSamplesPerPixel();
-    var t = fitSize(W, H, Math.min(S.maxPx, Math.floor(S.maxPx * 6.5 / Math.max(3, n))));
+    var tiff = cut ? cut.tiff : await GeoTIFF.fromBlob(file), main = await tiff.getImage(0);
+    var W0 = main.getWidth(), H0 = main.getHeight(), n = main.getSamplesPerPixel();
+    var win = cut ? cut.win : [0, 0, W0, H0], W = win[2] - win[0], H = win[3] - win[1];
+    var t = fitSize(W, H, cut ? 9e6 : Math.min(S.maxPx, Math.floor(S.maxPx * 6.5 / Math.max(3, n))));
     var img = main, count = await tiff.getImageCount();
     for (var i = 1; i < count; i++) { // usar una pirámide interna si alcanza
       var im = await tiff.getImage(i);
-      if (im.getSamplesPerPixel() === n && im.getWidth() >= t.w && im.getWidth() < img.getWidth()) img = im;
+      if (im.getSamplesPerPixel() === n && im.getWidth() / W0 * W >= t.w && im.getWidth() < img.getWidth()) img = im;
     }
-    if (img === main && W * H > 2.5e8) throw new Error('La imagen tiene ' + nf0.format(W * H / 1e6) + ' megapíxeles y no trae pirámides internas. Recortarla al área de la Península Potter antes de cargarla.');
-    var opts = { interleave: false };
-    if (img.getWidth() !== t.w || img.getHeight() !== t.h) { opts.width = t.w; opts.height = t.h; opts.resampleMethod = 'bilinear'; }
-    var ras = await img.readRasters(opts), N = t.w * t.h, bands = [];
+    var ras, N = t.w * t.h, bands = [], ks = img.getWidth() / W0, iw = [Math.round(win[0] * ks), Math.round(win[1] * ks), Math.round(win[2] * ks), Math.round(win[3] * ks)];
+    if ((iw[2] - iw[0]) * (iw[3] - iw[1]) > 6e7) ras = await readBanded(img, iw, t, n);
+    else {
+      var opts = { interleave: false, window: iw };
+      if (iw[2] - iw[0] !== t.w || iw[3] - iw[1] !== t.h) { opts.width = t.w; opts.height = t.h; opts.resampleMethod = 'bilinear'; }
+      ras = await img.readRasters(opts);
+    }
     for (var b = 0; b < n; b++) bands.push(ras[b] instanceof Float32Array ? ras[b] : Float32Array.from(ras[b]));
     var bits = main.getBitsPerSample(), eight = bits === 8 && main.getSampleFormat() === 1;
     var fd = main.fileDirectory || {}, nodata = main.getGDALNoData(), valid = null, bad = 0;
@@ -97,7 +114,7 @@
       var o = main.getOrigin(), r = main.getResolution(), gk = main.getGeoKeys() || {};
       var epsg = gk.ProjectedCSTypeGeoKey || gk.GeographicTypeGeoKey || 0;
       if (epsg === 32767) epsg = 0;
-      geo = { ox: o[0], oy: o[1], rx: r[0] * W / t.w, ry: r[1] * H / t.h, epsg: epsg };
+      geo = { ox: o[0] + win[0] * r[0], oy: o[1] + win[1] * r[1], rx: r[0] * W / t.w, ry: r[1] * H / t.h, epsg: epsg };
       if (!PE.crsKind(epsg) && Math.abs(o[0]) <= 180 && Math.abs(o[1]) <= 90 && Math.abs(r[0]) < 0.05) { geo.epsg = 4326; geo.assumed = true; }
     } catch (e) { geo = null; }
     var map = n >= 3 ? { r: 0, g: 1, b: 2, nir: -1, swir: -1 } : { r: 0, g: 0, b: 0, nir: -1, swir: -1 }, preset = 'rgb';
@@ -108,6 +125,7 @@
     }
     var sc = PE.makeScene({ w: t.w, h: t.h, bands: bands, eightBit: eight, valid: valid, map: map, geo: geo, name: file.name });
     sc.preset = n < 3 ? 'custom' : preset; sc.down = W / t.w; sc.orig = [W, H]; sc.date = guessDate(file.name, fd.DateTime || '');
+    sc.src = { tiff: tiff, file: file, win: win, W0: W0, H0: H0 };
     if (geo) { sc.pxArea = PE.pixelArea(geo, t.w, t.h); sc.gsdSource = 'leído del GeoTIFF' + (geo.epsg ? ' (EPSG:' + geo.epsg + (geo.assumed ? ', supuesto' : '') + ')' : ''); }
     return sc;
   }
@@ -410,9 +428,10 @@
     var sc = S.scene; if (!sc) return;
     var v = S.view;
     ctx.setTransform(dpr * v.k, 0, 0, dpr * v.k, dpr * v.x, dpr * v.y);
+    if (window.PCX) { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); window.PCX.under(ctx, r); ctx.setTransform(dpr * v.k, 0, 0, dpr * v.k, dpr * v.x, dpr * v.y); }
     ctx.imageSmoothingEnabled = v.k < 3;
-    ctx.drawImage(base, 0, 0);
-    if (S.ovOn && S.res) { ctx.globalAlpha = S.ovA; ctx.drawImage(fill, 0, 0); ctx.globalAlpha = Math.min(1, S.ovA + 0.45); ctx.drawImage(edge, 0, 0); ctx.globalAlpha = 1; }
+    ctx.globalAlpha = S.imgA === undefined ? 1 : S.imgA; ctx.drawImage(base, 0, 0); ctx.globalAlpha = 1;
+    if (S.ovOn && S.res) { ctx.globalAlpha = S.ovStyle === 'edge' ? 0 : S.ovA; ctx.drawImage(fill, 0, 0); ctx.globalAlpha = Math.min(1, S.ovA + 0.45); ctx.drawImage(edge, 0, 0); ctx.globalAlpha = 1; }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     function P(x, y) { return [x * v.k + v.x, y * v.k + v.y]; }
     if (S.ovOn && S.res) {
@@ -433,6 +452,7 @@
       ctx.lineWidth = 0.75; ctx.strokeStyle = '#000'; ctx.stroke();
     });
     if (sc.roi && sc.roiOn && sc.roiBox) { var ra = P(sc.roiBox[0], sc.roiBox[1]), rb2 = P(sc.roiBox[2], sc.roiBox[3]); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#ffe45c'; ctx.lineWidth = 1.25; ctx.strokeRect(ra[0], ra[1], rb2[0] - ra[0], rb2[1] - ra[1]); ctx.setLineDash([]); }
+    if (window.PCX) window.PCX.over(ctx, P);
     if (S.measure.length) {
       ctx.strokeStyle = '#ffe45c'; ctx.fillStyle = '#ffe45c'; ctx.lineWidth = 2; ctx.beginPath();
       S.measure.forEach(function (m, i) { var p = P(m[0], m[1]); if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); });
@@ -461,6 +481,7 @@
     cv.setPointerCapture(e.pointerId); var p = local(e); ptrs.set(e.pointerId, p);
     if (ptrs.size === 2) { var a = Array.from(ptrs.values()); pinch = { d: Math.hypot(a[0][0] - a[1][0], a[0][1] - a[1][1]) }; drag = null; return; }
     var im = toImg(p[0], p[1]);
+    if (window.PCX && window.PCX.down(p, im)) { drag = { ext: true }; return; }
     drag = { sx: p[0], sy: p[1], vx: S.view.x, vy: S.view.y, moved: false, pan: true, last: im };
   });
   cv.addEventListener('pointermove', function (e) {
@@ -472,6 +493,7 @@
       if (pinch.d > 0) zoomAt(d / pinch.d, (a[0][0] + a[1][0]) / 2, (a[0][1] + a[1][1]) / 2);
       pinch.d = d; return;
     }
+    if (drag && drag.ext) { window.PCX.move(p, toImg(p[0], p[1])); return; }
     if (drag) {
       if (Math.hypot(p[0] - drag.sx, p[1] - drag.sy) > 4) drag.moved = true;
       if (drag.pan) { S.view.x = drag.vx + p[0] - drag.sx; S.view.y = drag.vy + p[1] - drag.sy; draw(); }
@@ -481,6 +503,7 @@
     var p = local(e), d = drag; ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null;
     if (!d || !S.scene) { drag = null; return; }
     drag = null;
+    if (d.ext) { window.PCX.up(); return; }
     if (d.moved) return;
     var im = toImg(p[0], p[1]), sc = S.scene, inside = im[0] >= 0 && im[1] >= 0 && im[0] < sc.w && im[1] < sc.h;
     if (S.tool === 'measure' && inside) {
@@ -675,7 +698,14 @@
   window.addEventListener('resize', draw);
   if (!window.PC_WEB) { demo(PE.demoSatellite, 'Generando la escena de ejemplo…'); setTimeout(function () { fitView(true); }, 400); }
   window.__app = { S: S, loadFile: loadFile, loadDEM: loadDEM, fitView: fitView };
-  window.PCApp = { toast: toast, save: save, fmtLen: fmtLen, busy: busy, setScene: setScene, ensureGeoTIFF: ensureGeoTIFF, fitView: fitView,
+  async function cutFull(win) { // recorte de la imagen original a resolución completa
+    var sc = S.scene, src = sc && sc.src; if (!src) return;
+    busy('Leyendo la zona a resolución completa…');
+    try { var nsc = await loadTiff(src.file, { tiff: src.tiff, win: win }); nsc.parent = sc.parent || sc; nsc.name = sc.name; nsc.date = sc.date; setScene(nsc); }
+    catch (e) { toast(e && e.message ? e.message : 'No se pudo leer el recorte.'); }
+    busy(null);
+  }
+  window.PCApp = { S: S, draw: draw, schedule: schedule, selectComp: selectComp, lonlat: lonlat, layers: { base: base, fill: fill, edge: edge }, cutFull: cutFull, cv: cv, nf0: nf0, toast: toast, save: save, fmtLen: fmtLen, busy: busy, setScene: setScene, ensureGeoTIFF: ensureGeoTIFF, fitView: fitView,
     demo: function () { demo(PE.demoSatellite, 'Generando la escena de ejemplo…'); setTimeout(function () { fitView(true); }, 400); },
     current: function () { if (!S.scene || !S.res) return null; var t = totals(); return { scene: S.scene, res: S.res, px: t.px, m2: t.m2, dens: S.dens, method: S.method, gsd: PE.gsd(S.scene), samples: S.samples, cls: S.cls, blobs: S.blobs }; } };
 })();

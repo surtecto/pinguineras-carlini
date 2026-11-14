@@ -6,7 +6,8 @@
 <title>Pingüineras de Carlini</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body class="app">
 
@@ -20,6 +21,7 @@
     <button role="tab" type="button" data-view="censos" aria-selected="false">Colonias y censos</button>
     <button role="tab" type="button" data-view="serie" aria-selected="false">Mi serie</button>
     <button role="tab" type="button" data-view="ayuda" aria-selected="false">Cómo funciona</button>
+    <button role="tab" type="button" data-view="fuentes" aria-selected="false">Fuentes</button>
   </nav>
   <nav class="barlinks"><a href="manual.html">Manual</a><a href="https://github.com/surtecto/pinguineras-carlini">Código y datos</a></nav>
 </header>
@@ -39,6 +41,7 @@
         <div class="busy" id="busy" hidden><span id="busyTxt">Procesando…</span></div>
         <div class="drop" id="drop" hidden>Soltar la imagen aquí</div>
         <div class="scalebar" id="scalebar" hidden><span id="scaleTxt"></span><i id="scaleLine"></i></div>
+        <p class="basecredit" id="baseCredit" hidden>Base: Esri World Imagery (Esri, Earthstar Geographics), unos 10 m por píxel en este sector</p>
         <div class="zoom">
           <button class="btn icon" id="zIn" type="button" aria-label="Acercar">+</button>
           <button class="btn icon" id="zOut" type="button" aria-label="Alejar">−</button>
@@ -64,6 +67,13 @@
           <label class="check inline"><input id="ovOn" type="checkbox" checked> Mostrar lo detectado</label>
           <div class="slider inline"><label for="ovA" class="visually-hidden">Opacidad de la detección</label><input id="ovA" type="range" min="0" max="1" step="0.02"></div>
         </div>
+        <div class="field inline"><label for="ovStyle" class="visually-hidden">Estilo de lo detectado</label>
+          <select id="ovStyle"><option value="fill">Relleno</option><option value="edge">Sólo contorno</option></select></div>
+        <div class="ovgroup" id="baseGroup">
+          <label class="check inline"><input id="baseOn" type="checkbox" checked> Base Esri</label>
+          <div class="slider inline"><label for="imgA">Imagen</label><input id="imgA" type="range" min="0" max="1" step="0.02" value="1"></div>
+        </div>
+        <a class="gmaps" id="gmaps" href="#" target="_blank" rel="noopener">Ver en Google Maps</a>
         <p class="readout" id="readout">Arrastrar mueve la imagen; la rueda acerca.</p>
       </div>
       <span hidden><button id="toolPan" type="button"></button><button id="toolSample" type="button"></button></span>
@@ -97,6 +107,15 @@
             <button class="btn" id="s2go" type="button">Buscar</button>
             <div class="col" id="s2res" aria-live="polite"></div>
             <p class="hint">Lee en vivo el archivo abierto de Copernicus y baja sólo el recorte. Puede tardar uno o dos minutos por imagen.</p>
+          </div>
+        </details>
+        <details class="live" id="uavBox">
+          <summary>Ortomosaicos de dron (1 a 5 cm por píxel)</summary>
+          <div class="col">
+            <p class="hint">88 ortomosaicos públicos de la Isla 25 de Mayo, de 2019 a 2024, volados para censar elefantes marinos (Fudala y Bialik 2025, licencia CC0). En algunos se ven pingüinos: Península Potter 14/10/2022 (papúa), Lions Rump 23/10/2024 (Adelia y papúa), Patelnia 20/11/2019 (barbijo).</p>
+            <p class="hint"><b>Por qué no se abren solos:</b> pesan entre 35 MB y 3 GB cada uno (116 GB en total) y el repositorio no deja que otra página los lea por partes. Hay que bajar el archivo y soltarlo sobre la imagen. La app arma una vista general, que en archivos de 1 a 3 GB tarda unos minutos, y después se marca una zona para verla a resolución completa y contar aves.</p>
+            <div class="field"><label for="uavLoc">Lugar</label><select id="uavLoc"><option value="Potter_Peninsula">Península Potter (ZAEP 132)</option><option value="Lions_Rump">Lions Rump (ZAEP 151)</option><option value="Patelnia">Patelnia (ZAEP 128)</option><option value="Blue_Dyke">Blue Dyke (ZAEP 128)</option><option value="Paradise_Cove">Paradise Cove (ZAEP 128)</option></select></div>
+            <div id="uavList" class="uavlist"><p class="hint">Abrir este bloque consulta la lista de archivos en figshare.</p></div>
           </div>
         </details>
         <details class="live">
@@ -159,7 +178,16 @@
           </details>
         </div>
 
+        <h3>Zona de análisis</h3>
         <label class="check" id="roiRow" hidden><input id="roiOn" type="checkbox"> <span id="roiLbl">Analizar sólo la zona de interés</span></label>
+        <div class="row">
+          <button class="btn" id="roiEdit" type="button" aria-pressed="false">Editar la zona</button>
+          <button class="btn" id="roiNew" type="button">Dibujar otra</button>
+          <button class="btn" id="roiReset" type="button" hidden>Restablecer</button>
+        </div>
+        <p class="hint" id="roiHint">El recuadro amarillo de trazos limita dónde se busca. «Editar la zona» permite moverlo y cambiarle el tamaño desde los bordes; «Dibujar otra» lo reemplaza arrastrando sobre la imagen.</p>
+        <button class="btn primary" id="cutFull" type="button" hidden>Ver la zona a resolución completa</button>
+        <button class="btn" id="cutBack" type="button" hidden>Volver a la imagen completa</button>
         <details class="live">
           <summary>Limpiar lo detectado</summary>
           <div class="col">
@@ -180,9 +208,13 @@
         </dl>
         <p class="truth" id="truth" hidden></p>
         <p class="warn" id="warn" hidden></p>
-        <h3>Cada grupo</h3>
-        <div class="tablewrap"><table id="tbl"><thead><tr><th>N.º</th></tr></thead><tbody></tbody></table></div>
-        <p class="hint" id="tblNote"></p>
+        <h3>Cada grupo detectado</h3>
+        <p class="hint">Tocar una ficha lleva al grupo. La «señal» dice cuánto más rojizo y rosado es el grupo que el suelo común de la imagen.</p>
+        <div class="cards" id="cards"></div>
+        <details class="live"><summary>Tabla completa</summary>
+          <div class="tablewrap"><table id="tbl"><thead><tr><th>N.º</th></tr></thead><tbody></tbody></table></div>
+          <p class="hint" id="tblNote"></p>
+        </details>
         <h3>Guardar</h3>
         <div class="col">
           <button class="btn primary" id="goSerie" type="button">Agregar esta detección a mi serie</button>
@@ -295,20 +327,34 @@
 
   <!-- ===================== COLONIAS Y CENSOS ===================== -->
   <section class="view two" id="v-censos" hidden>
-    <div class="colscroll">
-      <h2>Las colonias del sector</h2>
-      <p class="hint">Conteos publicados de 70 colonias, <span id="spanYears">desde 1965/66</span>. Tocar una colonia para ver su serie a la derecha.</p>
-      <div class="mapwrap"><canvas id="regMap" aria-label="Mapa de colonias de la Isla 25 de Mayo y vecinas"></canvas></div>
-      <p class="hint">El círculo crece con el último conteo; el color indica la especie más numerosa. Costa simplificada: sirve de ubicación, no de cartografía.</p>
-      <div class="siteinfo" id="siteInfo"></div>
+    <div class="colscroll mapcol">
+      <div class="maphead">
+        <h2>Colonias del sector</h2>
+        <div class="field inline"><label for="siteSel">Colonia</label><select id="siteSel"></select></div>
+        <div class="seg" id="baseSel" role="tablist" aria-label="Fondo del mapa"><button type="button" data-base="sat" aria-selected="true">Satélite (Esri)</button><button type="button" data-base="osm" aria-selected="false">Mapa</button></div>
+      </div>
+      <div class="mapwrap big" id="regMap" aria-label="Mapa de colonias de la Isla 25 de Mayo y vecinas"></div>
+      <p class="hint">70 colonias con conteos publicados, <span id="spanYears">desde 1965/66</span>. El círculo crece con el último conteo y su color indica la especie más numerosa. Rueda o pellizco para acercar; tocar una colonia muestra sus datos a la derecha. En este sector la imagen de Esri tiene unos 10 m por píxel: al acercar más se ve borrosa.</p>
     </div>
     <div class="colscroll">
-      <h2>Conteos por temporada</h2>
+      <div class="siteinfo" id="siteInfo"></div>
+      <h3>Conteos por temporada</h3>
+      <div class="row charttools">
+        <button class="btn" type="button" data-span="all">Todo</button>
+        <button class="btn" type="button" data-span="1990">Desde 1990</button>
+        <button class="btn" type="button" data-span="2005">Desde 2005</button>
+        <label class="check inline"><input id="chartLog" type="checkbox"> Escala logarítmica</label>
+      </div>
       <div class="chartwrap"><canvas id="serie" aria-label="Serie de conteos por temporada"></canvas><div class="tip" id="tip" hidden></div></div>
+      <p class="hint">Rueda del ratón sobre el gráfico para acercar en el tiempo, arrastrar para desplazarse, doble clic para volver a ver todo. Tocar una especie en la leyenda la oculta.</p>
       <div class="legend" id="legend"></div>
+      <h3>Cada conteo y su fuente</h3>
+      <div class="tablewrap tall"><table id="countTbl"><thead><tr><th>Temporada</th><th>Especie</th><th>Conteo</th><th>Qué se contó</th><th>Precisión</th><th>Método</th><th>Fuente</th></tr></thead><tbody></tbody></table></div>
+      <h3>Quién investigó esta colonia</h3>
+      <ul class="reflist" id="siteRefs"></ul>
       <h3>El ciclo reproductivo y la señal en la imagen</h3>
       <div class="phenowrap"><table class="pheno" id="pheno"></table></div>
-      <p class="hint">Calendario aproximado para Punta Stranger. Con nieve tardía la señal se corre a fines de diciembre. Comparar entre temporadas sólo imágenes de la misma fase.</p>
+      <p class="hint">Calendario aproximado para Punta Stranger, armado con Carlini et al. 2009, Juáres et al. 2013 y Trivelpiece y Volkman 1979. Con nieve tardía la señal se corre a fines de diciembre.</p>
     </div>
   </section>
 
@@ -399,14 +445,8 @@
 
   <article>
     <h2>Imágenes públicas donde se ven individuos</h2>
-    <p>Desde el espacio no hay imágenes libres con ese detalle: lo abierto llega a 10 m (Sentinel-2) y las de 30 a 50 cm son comerciales. Lo que sí es público son ortomosaicos de dron, de 1,5 a 6 cm por píxel:</p>
-    <ul class="facts">
-      <li><b>Península Potter, ZAEP 132.</b> <a href="https://doi.org/10.6084/m9.figshare.29561684">Ortomosaicos polacos de 2019 a 2024</a>, con la península relevada al menos en 2022 a entre 1,5 y 2,2 cm por píxel, en UTM 21S. Se volaron para elefantes marinos entre septiembre y diciembre: cubren a los pingüinos sólo en parte, pero el del 14 de octubre de 2022 muestra agrupaciones tempranas de papúa.</li>
-      <li><b>Isla Ardley</b>, junto a la península Fildes: <a href="https://doi.org/10.5281/zenodo.14503437">imágenes y ortomosaicos</a> con Adelia, barbijo y papúa.</li>
-      <li><b>False Round Point</b>, costa norte de la isla: <a href="https://doi.org/10.25921/h3q1-1x73">ortomosaico de 5,6 cm</a> con 19.886 nidos de barbijo contados.</li>
-      <li><b>Fuera del sector:</b> <a href="https://www.usap-dc.org/dataset_search?free_text=Biota">colonias de la isla Ross</a>, <a href="https://doi.org/10.5285/28222725-c53d-40f4-9350-49c368899f0b">Sandwich del Sur</a> con coordenadas de nidos, y <a href="https://zenodo.org/record/6714100">cabo Shirreff</a> con anotaciones para entrenar detectores.</li>
-    </ul>
-    <p>Cargados en esta herramienta, esos GeoTIFF habilitan el conteo de individuos. Ninguno es un censo completo de Punta Stranger.</p>
+    <p>Desde el espacio no hay imágenes libres con ese detalle: lo abierto llega a 10 m (Sentinel-2), la base de Esri ronda los 10 m en este sector y las de 30 a 50 cm son comerciales. Lo que sí es público son ortomosaicos de dron. El conjunto que cubre la Península Potter es KGI-SESMAP (Fudala y Bialik 2025): 88 mosaicos de 1 a 5 cm por píxel, volados entre septiembre y diciembre para censar elefantes marinos. Cubren a los pingüinos sólo en parte y antes del pico de la temporada.</p>
+    <p>Se abren desde «Imagen», «Ortomosaicos de dron»: se baja el archivo, se suelta sobre la imagen, se marca una zona y se la ve a resolución completa para contar aves. La lista completa de conjuntos, con autores y enlaces, está en la pestaña «Fuentes».</p>
   </article>
 
   <article>
@@ -425,31 +465,69 @@
     </ul>
   </article>
 
-  <article class="wide">
-    <h2>Fuentes</h2>
-    <ul class="sources">
-      <li><a href="https://doi.org/10.1007/s00300-019-02614-0">Juáres et al. 2020</a>, Polar Biology: población de papúa en Punta Stranger.</li>
-      <li><a href="https://doi.org/10.1017/s0954102015000152">Juáres et al. 2015</a>, Antarctic Science: diecinueve años de Adelia en Punta Stranger.</li>
-      <li><a href="https://doi.org/10.1007/s00300-009-0637-y">Carlini et al. 2009</a>, Polar Biology: tendencias opuestas de Adelia y papúa.</li>
-      <li><a href="https://www.env.go.jp/nature/nankyoku/kankyohogo/database/jyouyaku/aspa/aspa_pdf_en/132.pdf">Plan de gestión de la ZAEP 132</a>, Medida 3 (2018).</li>
-      <li><a href="https://doi.org/10.1007/s00300-014-1451-8">LaRue et al. 2014</a>, Polar Biology: de superficie de guano a parejas con imágenes de 0,6 m.</li>
-      <li><a href="https://doi.org/10.1642/AUK-14-31.1">Lynch y LaRue 2014</a>, The Auk: primer censo global del Adelia.</li>
-      <li><a href="https://nora.nerc.ac.uk/id/eprint/517895/">Rees et al. 2017</a>, Antarctic Science: el color del guano y la astaxantina.</li>
-      <li><a href="https://nora.nerc.ac.uk/506751/1/Fretwell%20et%20al%20-%20Spectral%20signature%20of%20guano.pdf">Fretwell et al. 2015</a>, Remote Sensing of Environment: firma espectral del guano en Landsat.</li>
-      <li><a href="https://doi.org/10.3390/rs8050375">Witharana y Lynch 2016</a>, Remote Sensing: reglas por objetos y su transferencia entre sitios.</li>
-      <li><a href="https://doi.org/10.1080/15481603.2022.2101702">Román et al. 2022</a>, GIScience &amp; Remote Sensing: dron, Sentinel-2 y Landsat en Isla Decepción.</li>
-      <li><a href="https://www.umweltbundesamt.de/sites/default/files/medien/1410/publikationen/2017-04-06_texte_30-2017_pinguinmonitoring_eng_0.pdf">Mustafa et al. 2017</a>, Umweltbundesamt: variación del guano y de la densidad a lo largo de la temporada.</li>
-      <li><a href="https://data.aad.gov.au/metadata/records/ASAC_1219_AAT_APen_M_Area">Woehler 1999</a>, Australian Antarctic Data Centre: superficie y densidad en colonias de Adelia.</li>
-      <li><a href="https://github.com/CCheCastaldo/mapppdr">MAPPPD, Antarctic Penguin Biogeography Project</a> (mapppdr 3.1, CC BY 4.0): censos de las 70 colonias del sector.</li>
-      <li><a href="https://polarresearch.net/index.php/polar/article/download/3113/html?inline=1">Juáres et al. 2013</a>, Polar Research: cronología reproductiva del papúa en Punta Stranger.</li>
-      <li><a href="https://sora.unm.edu/sites/default/files/journals/auk/v096n04/p0675-p0681.pdf">Trivelpiece y Volkman 1979</a>, The Auk: arribo y puesta del Adelia en Point Thomas.</li>
-      <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12717269">Ortomosaicos de la Isla 25 de Mayo 2019–2024</a>, Scientific Data: incluye la ZAEP 132.</li>
-      <li><a href="https://www.naturalearthdata.com/">Natural Earth</a>: línea de costa del mapa de ubicación.</li>
-    </ul>
-    <p class="hint">Imágenes libres: <a href="https://browser.dataspace.copernicus.eu/">Copernicus Browser</a> (Sentinel-2) y <a href="https://earthexplorer.usgs.gov/">USGS EarthExplorer</a> (Landsat). Para muy alta resolución hacen falta imágenes comerciales o convenios institucionales.</p>
-  </article>
+
 
       </div>
+    </div>
+  </section>
+
+  <!-- ===================== FUENTES ===================== -->
+  <section class="view" id="v-fuentes" hidden>
+    <div class="colscroll help refs">
+      <h2>Fuentes y referencias</h2>
+      <p class="lede2">Todo lo que muestra esta herramienta sale de trabajos y bases de datos de otros. Acá está cada uno, con sus autores y su enlace.</p>
+
+      <h3>Censos de las colonias</h3>
+      <p>Los 833 conteos de las 70 colonias provienen de <b>MAPPPD</b>, la base abierta del Antarctic Penguin Biogeography Project (Che-Castaldo, Humphries y Lynch; paquete <a href="https://github.com/CCheCastaldo/mapppdr">mapppdr 3.1</a>, licencia CC BY 4.0), que reúne conteos publicados por muchos equipos. En Punta Stranger, los censos de terreno son del <b>Instituto Antártico Argentino</b> (Carlini, Coria, Santos, Negrete, Juáres y colaboradores), que la monitorea desde 1995/96. Estas son las <span id="refCount">61</span> publicaciones de las que salen los conteos del sector; en «Colonias y censos» cada conteo lleva la suya.</p>
+      <ol class="reflist" id="allRefs"></ol>
+
+      <h3>Imágenes, relieve y mapas</h3>
+      <ul class="reflist">
+        <li><b>Sentinel-2 L2A.</b> Agencia Espacial Europea, programa Copernicus. 13 recortes de 2019 a 2025 leídos de <a href="https://earth-search.aws.element84.com/v1">Earth Search</a> (Element 84) en AWS. Contiene datos Copernicus Sentinel modificados. Visor oficial: <a href="https://browser.dataspace.copernicus.eu/">Copernicus Browser</a>.</li>
+        <li><b>Copernicus DEM GLO-30.</b> Modelo de elevación de 30 m. © DLR e.V. 2010–2014 y © Airbus Defence and Space GmbH 2014–2018, provisto bajo licencia COPERNICUS por la Unión Europea y la ESA.</li>
+        <li><b>Esri World Imagery.</b> Imagen de base del visor y del mapa de colonias. Fuente: Esri, Earthstar Geographics. En este sector llega a unos 10 m por píxel.</li>
+        <li><b>OpenStreetMap.</b> Fondo «Mapa» del mapa de colonias. © colaboradores de <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, licencia ODbL.</li>
+        <li><b>Natural Earth.</b> Línea de costa a escala 1:10 millones, dominio público. <a href="https://www.naturalearthdata.com/">naturalearthdata.com</a></li>
+        <li><b>Landsat.</b> No está incorporado; se consigue en <a href="https://earthexplorer.usgs.gov/">USGS EarthExplorer</a>.</li>
+      </ul>
+
+      <h3>Ortomosaicos de dron y otros conjuntos con individuos visibles</h3>
+      <ul class="reflist">
+        <li>Fudala, K. y Bialik, R. J. (2025). <i>RPAS-derived orthomosaic dataset of Southern Elephant Seal breeding colonies on King George Island (2019–2024)</i>. Scientific Data 12, 1973. <a href="https://doi.org/10.1038/s41597-025-06230-y">doi:10.1038/s41597-025-06230-y</a> (<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12717269">texto completo</a>). Datos: <b>KGI-SESMAP</b>, figshare, CC0, <a href="https://doi.org/10.6084/m9.figshare.29561684">doi:10.6084/m9.figshare.29561684</a>. 88 GeoTIFF en UTM 21S, de 1,04 a 4,89 cm por píxel, de Península Potter, Lions Rump, Patelnia, Blue Dyke y Paradise Cove.</li>
+        <li>Isla Ardley, península Fildes: imágenes y ortomosaicos de dron con Adelia, barbijo y papúa. Zenodo, <a href="https://doi.org/10.5281/zenodo.14503437">doi:10.5281/zenodo.14503437</a>.</li>
+        <li>False Round Point, costa norte de la isla: ortomosaico de 5,6 cm con 19.886 nidos de barbijo contados. NOAA NCEI, <a href="https://doi.org/10.25921/h3q1-1x73">doi:10.25921/h3q1-1x73</a>.</li>
+        <li>Islas Sandwich del Sur: mosaicos con coordenadas de nidos. UK Polar Data Centre, <a href="https://doi.org/10.5285/28222725-c53d-40f4-9350-49c368899f0b">doi:10.5285/28222725-c53d-40f4-9350-49c368899f0b</a>.</li>
+        <li>Cabo Shirreff, isla Livingston: imágenes con anotaciones para entrenar detectores. Zenodo, <a href="https://zenodo.org/record/6714100">registro 6714100</a>.</li>
+        <li>Isla Ross: colonias de Adelia. <a href="https://www.usap-dc.org/dataset_search?free_text=Biota">USAP Data Center</a>.</li>
+      </ul>
+      <p class="hint">De los cinco últimos conjuntos esta herramienta sólo conoce el repositorio y el identificador; los autores figuran en cada registro.</p>
+
+      <h3>Punta Stranger y la ZAEP 132</h3>
+      <ul class="reflist">
+        <li>Juáres, M. A., Casaux, R., Negrete, J. y otros (2020). <i>Update of the population size and breeding performance of gentoo penguins (Pygoscelis papua) at Stranger Point/Cabo Funes, South Shetland Islands</i>. Polar Biology 43, 123–129. <a href="https://doi.org/10.1007/s00300-019-02614-0">doi:10.1007/s00300-019-02614-0</a></li>
+        <li>Juáres, M. A., Santos, M. M., Negrete, J. y otros (2015). <i>Adélie penguin population changes at Stranger Point: 19 years of monitoring</i>. Antarctic Science 27, 455–461. <a href="https://doi.org/10.1017/s0954102015000152">doi:10.1017/S0954102015000152</a></li>
+        <li>Juáres, M. A. y otros (2013). Cronología reproductiva del papúa en Punta Stranger. Polar Research 32. <a href="https://polarresearch.net/index.php/polar/article/download/3113/html?inline=1">texto completo</a></li>
+        <li>Carlini, A. R., Coria, N. R., Santos, M. M., Negrete, J., Juáres, M. A. y Daneri, G. A. (2009). <i>Responses of Pygoscelis adeliae and P. papua populations to environmental changes at Isla 25 de Mayo (King George Island)</i>. Polar Biology 32, 1427–1433. <a href="https://doi.org/10.1007/s00300-009-0637-y">doi:10.1007/s00300-009-0637-y</a></li>
+        <li>Trivelpiece, W. y Volkman, N. J. (1979). Arribo y puesta del Adelia en Point Thomas. The Auk 96, 675–681. <a href="https://sora.unm.edu/sites/default/files/journals/auk/v096n04/p0675-p0681.pdf">texto completo</a></li>
+        <li>Reunión Consultiva del Tratado Antártico (2018). <i>Plan de gestión de la Zona Antártica Especialmente Protegida N.º 132, Península Potter</i>. Medida 3. <a href="https://www.env.go.jp/nature/nankyoku/kankyohogo/database/jyouyaku/aspa/aspa_pdf_en/132.pdf">texto</a></li>
+      </ul>
+
+      <h3>El método: guano, superficie y parejas</h3>
+      <ul class="reflist">
+        <li>LaRue, M. A., Lynch, H. J., Lyver, P. O. B. y otros (2014). <i>A method for estimating colony sizes of Adélie penguins using remote sensing imagery</i>. Polar Biology 37, 507–517. <a href="https://doi.org/10.1007/s00300-014-1451-8">doi:10.1007/s00300-014-1451-8</a>. De superficie de guano a parejas con imágenes de 0,6 m.</li>
+        <li>Lynch, H. J. y LaRue, M. A. (2014). <i>First global census of the Adélie penguin</i>. The Auk 131, 457–466. <a href="https://doi.org/10.1642/AUK-14-31.1">doi:10.1642/AUK-14-31.1</a></li>
+        <li>Rees, W. G., Brown, J. A., Fretwell, P. T. y Trathan, P. N. (2017). <i>What colour is penguin guano?</i> Antarctic Science 29, 417–425. <a href="https://nora.nerc.ac.uk/id/eprint/517895/">repositorio NORA</a>. El color del guano y la astaxantina.</li>
+        <li>Fretwell, P. T., Phillips, R. A., Brooke, M. de L., Fleming, A. H. y McArthur, A. (2015). <i>Using the unique spectral signature of guano to identify unknown seabird colonies</i>. Remote Sensing of Environment 156, 448–456. <a href="https://nora.nerc.ac.uk/506751/1/Fretwell%20et%20al%20-%20Spectral%20signature%20of%20guano.pdf">texto completo</a></li>
+        <li>Witharana, C. y Lynch, H. J. (2016). <i>An object-based image analysis approach for detecting penguin guano in very high spatial resolution satellite images</i>. Remote Sensing 8(5), 375. <a href="https://doi.org/10.3390/rs8050375">doi:10.3390/rs8050375</a></li>
+        <li>Román, A. y otros (2022). Dron, Sentinel-2 y Landsat sobre una colonia de barbijo en Isla Decepción. GIScience &amp; Remote Sensing 59. <a href="https://doi.org/10.1080/15481603.2022.2101702">doi:10.1080/15481603.2022.2101702</a></li>
+        <li>Mustafa, O. y otros (2017). <i>Monitoring penguin colonies in the Antarctic using remote sensing data</i>. Umweltbundesamt, Texte 30/2017. <a href="https://www.umweltbundesamt.de/sites/default/files/medien/1410/publikationen/2017-04-06_texte_30-2017_pinguinmonitoring_eng_0.pdf">texto completo</a>. Variación del guano y de la densidad a lo largo de la temporada.</li>
+        <li>Woehler, E. J. (1999). Superficie y densidad en colonias de Adelia de la costa de Mawson: 0,63 ± 0,3 parejas por metro cuadrado. Australian Antarctic Data Centre, <a href="https://data.aad.gov.au/metadata/records/ASAC_1219_AAT_APen_M_Area">registro ASAC_1219</a>.</li>
+      </ul>
+
+      <h3>Programas usados</h3>
+      <ul class="reflist">
+        <li><a href="https://geotiffjs.github.io/">geotiff.js</a> 2.1.3 (licencia MIT), lectura de GeoTIFF. <a href="https://leafletjs.com/">Leaflet</a> 1.9.4 (licencia BSD de 2 cláusulas), mapa de colonias. El resto del código es propio y está en el <a href="https://github.com/surtecto/pinguineras-carlini">repositorio</a>.</li>
+      </ul>
     </div>
   </section>
 
@@ -469,11 +547,13 @@
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>window.PC_WEB = true;</script>
-<script src="data.js?v=2"></script>
-<script src="engine.js?v=2"></script>
-<script src="app.js?v=2"></script>
-<script src="tiempo.js?v=2"></script>
-<script src="sentinel.js?v=2"></script>
-<script src="ui.js?v=2"></script>
+<script src="data.js?v=3"></script>
+<script src="engine.js?v=3"></script>
+<script src="app.js?v=3"></script>
+<script src="extra.js?v=3"></script>
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="tiempo.js?v=3"></script>
+<script src="sentinel.js?v=3"></script>
+<script src="ui.js?v=3"></script>
 </body>
 </html>

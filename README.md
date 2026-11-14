@@ -28,9 +28,11 @@ Es una herramienta de exploración, **sin validación de campo**. A 10 m por pí
 | `tiempo.js` | Mapa del sector, series de censos, registro de detecciones |
 | `sentinel.js` | Escenas Sentinel-2 incluidas y lectura en vivo del archivo |
 | `ui.js` | Pestañas, panel de tres pasos y franja de estado |
+| `extra.js` | Base Esri bajo la imagen, zona de análisis editable, fichas por grupo, lista de ortomosaicos de dron |
 | `data.js` | Censos (MAPPPD) y línea de costa (Natural Earth) |
 | `datos/` | Recortes Sentinel-2, relieve Copernicus DEM, catálogo y serie inicial |
 | `vendor/geotiff.js` | Lector GeoTIFF (geotiff.js 2.1.3, licencia MIT) |
+| `vendor/leaflet/` | Mapa de colonias (Leaflet 1.9.4, licencia BSD de 2 cláusulas) |
 | `docs/` | Informe de trabajo y manual en Word |
 
 ## Datos y créditos
