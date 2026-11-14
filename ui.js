@@ -79,7 +79,7 @@
   function finish() {
     var c = A.current(); RUN.on = false; $('status').classList.remove('running'); $('runBar').hidden = true; $('rerun').disabled = false;
     update(); if (!c) return;
-    var p = RUN.prev, n = c.res.comps.length, st = $('stamp'), now = new Date().toLocaleTimeString('es-AR'), fresh = c.res.comps.filter(function (k) { return k.isNew; }).length, txt;
+    var p = RUN.prev, n = c.res.comps.length, st = $('stamp'), dt = new Date(), now = [dt.getHours(), dt.getMinutes(), dt.getSeconds()].map(function (v) { return (v < 10 ? '0' : '') + v; }).join(':'), fresh = c.res.comps.filter(function (k) { return k.isNew; }).length, txt;
     if (!p || p.scene !== c.scene) txt = 'Detección hecha a las ' + now + ' · ' + zoneTxt(c.scene) + '.';
     else if (p.px === c.px && p.n === n) txt = 'Se volvió a detectar a las ' + now + ' y el resultado es el mismo (' + zoneTxt(c.scene) + ').' + (p.zone !== zoneTxt(c.scene) ? ' En la parte nueva de la zona no hay nada con color de guano.' : '');
     else { var d = (c.px - p.px) * (c.scene.pxArea || 1); txt = 'Se volvió a detectar a las ' + now + ' · ' + zoneTxt(c.scene) + '. Antes: ' + p.area + ' en ' + p.n + (p.n === 1 ? ' grupo' : ' grupos') + '. Ahora: ' + area(c) + ' en ' + n + ' (' + (d >= 0 ? '+' : '−') + nf0.format(Math.abs(d)) + (PE.gsd(c.scene) ? ' m²' : ' px') + (fresh ? ', ' + fresh + (fresh === 1 ? ' grupo nuevo, marcado' : ' grupos nuevos, marcados') + ' en naranja' : '') + ').'; }
