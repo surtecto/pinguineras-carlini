@@ -64,11 +64,21 @@
     var c = PE.lonLatToUTM(s.lon, s.lat, 21, true), sn = function (v) { return Math.round(v / 20) * 20; };
     return { x0: sn(c[0] - s.kx * 1000), x1: sn(c[0] + s.kx * 1000), y0: sn(c[1] - s.ky * 1000), y1: sn(c[1] + s.ky * 1000) };
   }
-  async function readWin(url, W, outW, outH, method) {
-    var tiff = await GeoTIFF.fromUrl(url), img = await tiff.getImage(), o = img.getOrigin(), r = img.getResolution(), ry = Math.abs(r[1]);
+  /* lectura de una ventana con corte por demora y reintentos: las conexiones lentas dejan pedidos colgados */
+  async function readWinTry(url, W, outW, outH, method, ms, tries) {
+    var last;
+    for (var t = 0; t < tries; t++) {
+      var ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, ms);
+      try { var out = await readWin(url, W, outW, outH, method, ctl.signal); clearTimeout(timer); return out; }
+      catch (e) { clearTimeout(timer); last = e; if (e && e.message === 'fuera') throw e; }
+    }
+    throw new Error(last && last.name === 'AbortError' ? 'El servidor de imágenes tardó demasiado. Volver a intentar.' : (last && last.message) || 'lectura fallida');
+  }
+  async function readWin(url, W, outW, outH, method, signal) {
+    var tiff = await GeoTIFF.fromUrl(url, { blockSize: 524288, cacheSize: 40 }, signal), img = await tiff.getImage(), o = img.getOrigin(), r = img.getResolution(), ry = Math.abs(r[1]);
     var px0 = Math.round((W.x0 - o[0]) / r[0]), px1 = Math.round((W.x1 - o[0]) / r[0]), py0 = Math.round((o[1] - W.y1) / ry), py1 = Math.round((o[1] - W.y0) / ry);
     if (px0 < 0 || py0 < 0 || px1 > img.getWidth() || py1 > img.getHeight()) throw new Error('fuera');
-    var opt = { window: [px0, py0, px1, py1], interleave: false };
+    var opt = { window: [px0, py0, px1, py1], interleave: false, signal: signal };
     if (outW) { opt.width = outW; opt.height = outH; opt.resampleMethod = method; }
     return (await img.readRasters(opt))[0];
   }
@@ -85,8 +95,8 @@
       if (!items.length) { box.textContent = 'No hay escenas de esa temporada en el archivo. La cobertura de este sector empieza en 2018/19.'; return; }
       box.textContent = 'Midiendo las nubes sobre el sector en ' + items.length + ' escenas…';
       var q = items.slice(), done = 0;
-      async function worker() { while (q.length) { var it = q.shift(); try { var scl = await tmo(readWin(it.a.scl, W), 30000), bad = 0; for (var i = 0; i < scl.length; i++) if (BAD[scl[i]]) bad++; it.nubes = bad / scl.length; } catch (e) { it.nubes = null; } done++; box.textContent = 'Midiendo las nubes sobre el sector: ' + done + ' de ' + items.length + '…'; } }
-      await A.ensureGeoTIFF(); await Promise.all([worker(), worker(), worker(), worker(), worker()]);
+      async function worker() { while (q.length) { var it = q.shift(); try { var scl = await readWinTry(it.a.scl, W, undefined, undefined, undefined, 25000, 2), bad = 0; for (var i = 0; i < scl.length; i++) if (BAD[scl[i]]) bad++; it.nubes = bad / scl.length; } catch (e) { it.nubes = null; } done++; box.textContent = 'Midiendo las nubes sobre el sector: ' + done + ' de ' + items.length + '…'; } }
+      await A.ensureGeoTIFF(); await Promise.all([worker(), worker(), worker(), worker()]);
       var best = {}; items.forEach(function (it) { if (it.nubes === null) return; var k = it.fecha; if (!best[k] || it.nubes < best[k].nubes - 0.01 || (Math.abs(it.nubes - best[k].nubes) <= 0.01 && it.off && !best[k].off)) best[k] = it; });
       var list = Object.keys(best).map(function (k) { return best[k]; }).sort(function (a, b) { return a.nubes - b.nubes; }).slice(0, 12);
       box.textContent = '';
@@ -105,7 +115,7 @@
       await A.ensureGeoTIFF();
       var w = (W.x1 - W.x0) / 10, h = (W.y1 - W.y0) / 10, raw = [];
       var urls = [[it.a.b], [it.a.g], [it.a.r], [it.a.n], [it.a.s, w, h, 'bilinear'], [it.a.scl, w, h, 'nearest']];
-      for (var k = 0; k < urls.length; k++) raw.push(await tmo(readWin(urls[k][0], W, urls[k][1], urls[k][2], urls[k][3]), 60000));
+      for (var k = 0; k < urls.length; k++) { A.busy('Leyendo Sentinel-2 del ' + it.fecha + ': banda ' + (k + 1) + ' de 6…'); raw.push(await readWinTry(urls[k][0], W, urls[k][1], urls[k][2], urls[k][3], 45000, 3)); }
       var sub = it.pb >= '04.00' && !it.off ? 1000 : 0, bands = raw.slice(0, 5).map(function (a) { var o = new Float32Array(a.length); for (var i = 0; i < a.length; i++) { var v = a[i]; o[i] = v === 0 ? 0 : (v > sub ? v - sub : 1); } return o; });
       var e = { fecha: it.fecha, nubes: it.nubes || 0 };
       var sc = await makeScene({ w: w, h: h, bands: bands, scl: raw[5], ox: W.x0, oy: W.y1, name: 'Sentinel-2 ' + it.fecha + ' · ' + s.n, date: it.fecha, note: note(e, 'Leída en vivo del archivo abierto. ') });
