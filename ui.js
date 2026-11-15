@@ -54,7 +54,7 @@
       msg = 'Detección automática lista: lo celeste tiene color de guano' + (sc.roi && sc.roiOn ? ', dentro del recuadro de trazos' : '') + '. Tocar una mancha muestra sus datos; en «Detección» se ajusta si sobra o falta.';
       if (sc.synthetic) msg = 'Imagen inventada para practicar. ' + msg;
     }
-    if (sc.src && sc.down > 1.2) msg = 'Vista general: la imagen original se redujo ' + Math.round(sc.down) + ' veces para entrar en pantalla. Para trabajar con todo el detalle, en «Detección» marcar una zona y pulsar «Ver la zona a resolución completa». ' + (n ? '' : '');
+    if (sc.src && sc.down > 1.2) msg = 'Vista general: la imagen original se redujo ' + String(Math.round(sc.down * 10) / 10).replace('.', ',') + ' veces para entrar en pantalla. Para trabajar con todo el detalle, en «Detección» marcar una zona y pulsar «Ver la zona a resolución completa». ' + (n ? '' : '');
     else if (sc.parent) msg = 'Recorte a resolución completa de la zona marcada. ' + msg + ' «Volver a la imagen completa» está en «Detección».';
     diag.textContent = msg;
     hint.innerHTML = '';

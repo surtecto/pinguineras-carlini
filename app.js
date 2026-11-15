@@ -705,7 +705,7 @@
     catch (e) { toast(e && e.message ? e.message : 'No se pudo leer el recorte.'); }
     busy(null);
   }
-  window.PCApp = { S: S, draw: draw, schedule: schedule, selectComp: selectComp, lonlat: lonlat, layers: { base: base, fill: fill, edge: edge }, cutFull: cutFull, cv: cv, nf0: nf0, toast: toast, save: save, fmtLen: fmtLen, busy: busy, setScene: setScene, ensureGeoTIFF: ensureGeoTIFF, fitView: fitView,
+  window.PCApp = { loadFile: loadFile, S: S, draw: draw, schedule: schedule, selectComp: selectComp, lonlat: lonlat, layers: { base: base, fill: fill, edge: edge }, cutFull: cutFull, cv: cv, nf0: nf0, toast: toast, save: save, fmtLen: fmtLen, busy: busy, setScene: setScene, ensureGeoTIFF: ensureGeoTIFF, fitView: fitView,
     demo: function () { demo(PE.demoSatellite, 'Generando la escena de ejemplo…'); setTimeout(function () { fitView(true); }, 400); },
     current: function () { if (!S.scene || !S.res) return null; var t = totals(); return { scene: S.scene, res: S.res, px: t.px, m2: t.m2, dens: S.dens, method: S.method, gsd: PE.gsd(S.scene), samples: S.samples, cls: S.cls, blobs: S.blobs }; } };
 })();

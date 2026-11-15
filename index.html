@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body class="app">
 
@@ -119,6 +119,10 @@
           <div class="col">
             <p class="hint">88 ortomosaicos públicos de la Isla 25 de Mayo, de 2019 a 2024, volados para censar elefantes marinos (Fudala y Bialik 2025, licencia CC0). En algunos se ven pingüinos: Península Potter 14/10/2022 (papúa), Lions Rump 23/10/2024 (Adelia y papúa), Patelnia 20/11/2019 (barbijo).</p>
             <p class="hint"><b>Por qué no se abren solos:</b> pesan entre 35 MB y 3 GB cada uno (116 GB en total) y el repositorio no deja que otra página los lea por partes. Hay que bajar el archivo y soltarlo sobre la imagen. La app arma una vista general, que en archivos de 1 a 3 GB tarda unos minutos, y después se marca una zona para verla a resolución completa y contar aves.</p>
+            <p class="hint"><b>Recortes reales ya incluidos</b>, del mosaico de Península Potter del 14/10/2022, sobre los grupos de papúa de Punta Stranger:</p>
+            <button class="btn" type="button" data-uav="datos/potter_dron_20221014_conjunto.tif">Conjunto de grupos · 161 × 161 m a 5,9 cm por píxel (11 MB)</button>
+            <button class="btn" type="button" data-uav="datos/potter_dron_20221014_detalle.tif">Detalle de un grupo · 41 × 41 m a 1,5 cm por píxel (9 MB)</button>
+            <p class="hint">Los mosaicos completos se bajan desde esta lista:</p>
             <div class="field"><label for="uavLoc">Lugar</label><select id="uavLoc"><option value="Potter_Peninsula">Península Potter (ZAEP 132)</option><option value="Lions_Rump">Lions Rump (ZAEP 151)</option><option value="Patelnia">Patelnia (ZAEP 128)</option><option value="Blue_Dyke">Blue Dyke (ZAEP 128)</option><option value="Paradise_Cove">Paradise Cove (ZAEP 128)</option></select></div>
             <div id="uavList" class="uavlist"><p class="hint">Abrir este bloque consulta la lista de archivos en figshare.</p></div>
           </div>
@@ -552,13 +556,13 @@
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>window.PC_WEB = true;</script>
-<script src="data.js?v=6"></script>
-<script src="engine.js?v=6"></script>
-<script src="app.js?v=6"></script>
-<script src="extra.js?v=6"></script>
+<script src="data.js?v=7"></script>
+<script src="engine.js?v=7"></script>
+<script src="app.js?v=7"></script>
+<script src="extra.js?v=7"></script>
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="tiempo.js?v=6"></script>
-<script src="sentinel.js?v=6"></script>
-<script src="ui.js?v=6"></script>
+<script src="tiempo.js?v=7"></script>
+<script src="sentinel.js?v=7"></script>
+<script src="ui.js?v=7"></script>
 </body>
 </html>

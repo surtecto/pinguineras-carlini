@@ -181,5 +181,13 @@
       .catch(function () { $('uavList').innerHTML = 'No se pudo consultar figshare desde esta red. La lista completa está en <a href="https://doi.org/10.6084/m9.figshare.29561684" target="_blank" rel="noopener">doi:10.6084/m9.figshare.29561684</a>.'; });
   });
   $('uavLoc').addEventListener('change', uavList);
+  Array.prototype.forEach.call(document.querySelectorAll('[data-uav]'), function (b) {
+    b.addEventListener('click', function () {
+      var url = b.dataset.uav; A.busy('Bajando el recorte de dron…');
+      fetch(url).then(function (r) { if (!r.ok) throw new Error('sin archivo'); return r.blob(); })
+        .then(function (bl) { return A.loadFile(new File([bl], url.split('/').pop(), { type: 'image/tiff' })); })
+        .catch(function () { A.busy(null); A.toast('No se pudo bajar el recorte.'); });
+    });
+  });
   sync();
 })();
