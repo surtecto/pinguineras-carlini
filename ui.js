@@ -35,11 +35,14 @@
     var c = A.current(), box = $('status'), sum = $('sumBar'), diag = $('diag'), hint = $('hintbar');
     if (!c) return;
     var sc = c.scene, n = c.res.comps.length, ml = c.method === 'ml', g = c.samples.filter(function (s) { return s.cls === 'guano'; }).length, no = c.samples.length - g;
-    box.className = 'status' + (n ? '' : ' zero');
+    var NS = window.PCX && window.PCX.nest;
+    var fine = PE.gsd(sc) && PE.gsd(sc) <= 0.035;
+    function dron() { var t = ''; if (NS && NS.on && c.blobs && (fine || c.blobs.length)) t += c.blobs.length + (fine ? ' nidos · ' : ' nidos marcados a mano · '); if (NS && NS.birdOn && fine) t += NS.birds.length + ' pingüinos fuera del nido · '; return t; }
+    box.className = 'status' + (n || dron() ? '' : ' zero');
     $('zZone').hidden = !(sc.roi && sc.roiBox);
     if (n) {
-      sum.textContent = $('kArea').textContent + ' con color de guano · ' + n + (n === 1 ? ' grupo' : ' grupos') + (c.blobs ? ' · ' + c.blobs.length + (window.PCX && window.PCX.nest.on ? ' nidos marcados' : ' aves contadas') : '');
-    } else sum.textContent = c.blobs && window.PCX && window.PCX.nest.on ? c.blobs.length + ' nidos marcados · sin color de guano' : 'No se detectó guano';
+      sum.textContent = dron() + $('kArea').textContent + ' con color de guano · ' + n + (n === 1 ? ' grupo' : ' grupos') + (c.blobs && !(NS && NS.on) ? ' · ' + c.blobs.length + ' aves contadas' : '');
+    } else sum.textContent = dron() ? dron() + 'sin color de guano' : 'No se detectó guano';
     var msg;
     if (ml) {
       if (!g) msg = 'Modo con ejemplos: tocar en la imagen una mancha de guano, rosada o rojiza. Arrastrar sigue moviendo la imagen.';
@@ -54,7 +57,8 @@
       msg = 'Detección automática lista: lo celeste tiene color de guano' + (sc.roi && sc.roiOn ? ', dentro del recuadro de trazos' : '') + '. Tocar una mancha muestra sus datos; en «Detección» se ajusta si sobra o falta.';
       if (sc.synthetic) msg = 'Imagen inventada para practicar. ' + msg;
     }
-    if (window.PCX && window.PCX.nest.on && c.blobs) msg = 'Imagen de dron: los círculos amarillos son nidos (discos oscuros sobre suelo sin nieve). Es un borrador: tocar un círculo lo quita y tocar un nido sin marcar lo agrega. Lo celeste es el borde teñido de guano, no los nidos. «Ubicar» muestra dónde está la imagen.';
+    if (NS && (NS.on || NS.birdOn) && PE.gsd(sc) && PE.gsd(sc) <= 0.15 && !fine) msg = 'Imagen de dron de conjunto: con este detalle sólo se detecta sola la mancha de guano. Para nidos y pingüinos, abrir el recorte de detalle (1,5 cm por píxel) o marcar los nidos a mano tocando la imagen.';
+    else if (dron()) msg = 'Imagen de dron: círculos amarillos, nidos; círculos naranjas, posibles pingüinos fuera del nido, sobre la nieve; celeste, borde teñido de guano. Son borradores: tocar un círculo lo quita y tocar un nido sin marcar lo agrega. «Clasificar toda la imagen» los pinta junto con nieve, suelo y agua.';
     else if (sc.src && sc.down > 1.2) msg = 'Vista general: la imagen original se redujo ' + String(Math.round(sc.down * 10) / 10).replace('.', ',') + ' veces para entrar en pantalla. Para trabajar con todo el detalle, en «Detección» marcar una zona y pulsar «Ver la zona a resolución completa». ' + (n ? '' : '');
     else if (sc.parent) msg = 'Recorte a resolución completa de la zona marcada. ' + msg + ' «Volver a la imagen completa» está en «Detección».';
     diag.textContent = msg;

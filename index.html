@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=12">
 </head>
 <body class="app">
 
@@ -127,8 +127,14 @@
             <p class="hint">88 ortomosaicos públicos de la Isla 25 de Mayo, de 2019 a 2024, volados para censar elefantes marinos (Fudala y Bialik 2025, licencia CC0). En algunos se ven pingüinos: Península Potter 14/10/2022 (papúa), Lions Rump 23/10/2024 (Adelia y papúa), Patelnia 20/11/2019 (barbijo).</p>
             <p class="hint"><b>Por qué no se abren solos:</b> pesan entre 35 MB y 3 GB cada uno (116 GB en total) y el repositorio no deja que otra página los lea por partes. Hay que bajar el archivo y soltarlo sobre la imagen. La app arma una vista general, que en archivos de 1 a 3 GB tarda unos minutos, y después se marca una zona para verla a resolución completa y contar aves.</p>
             <p class="hint"><b>Recortes reales ya incluidos</b>, del mosaico de Península Potter del 14/10/2022, sobre los grupos de papúa de Punta Stranger:</p>
-            <button class="btn" type="button" data-uav="datos/potter_dron_20221014_conjunto.tif">Conjunto de grupos · 161 × 161 m a 5,9 cm por píxel (11 MB)</button>
-            <button class="btn" type="button" data-uav="datos/potter_dron_20221014_detalle.tif">Detalle de un grupo · 41 × 41 m a 1,5 cm por píxel (9 MB)</button>
+            <button class="btn" type="button" data-uav="datos/potter_dron_20221014_conjunto.tif">Conjunto de grupos · 161 × 161 m a 5,9 cm por píxel (11 MB): sólo guano y marcado a mano</button>
+            <p class="hint">Detalles de 41 × 41 m a 1,5 cm por píxel (9 MB cada uno). <b>En estos se marcan solos los nidos y los pingüinos:</b></p>
+            <div class="row">
+              <button class="btn" type="button" data-uav="datos/potter_dron_20221014_detalle.tif">Centro</button>
+              <button class="btn" type="button" data-uav="datos/potter_dron_20221014_detalle_norte.tif">Norte</button>
+              <button class="btn" type="button" data-uav="datos/potter_dron_20221014_detalle_noroeste.tif">Noroeste</button>
+              <button class="btn" type="button" data-uav="datos/potter_dron_20221014_detalle_sudoeste.tif">Sudoeste</button>
+            </div>
             <p class="hint">Los mosaicos completos se bajan desde esta lista:</p>
             <div class="field"><label for="uavLoc">Lugar</label><select id="uavLoc"><option value="Potter_Peninsula">Península Potter (ZAEP 132)</option><option value="Lions_Rump">Lions Rump (ZAEP 151)</option><option value="Patelnia">Patelnia (ZAEP 128)</option><option value="Blue_Dyke">Blue Dyke (ZAEP 128)</option><option value="Paradise_Cove">Paradise Cove (ZAEP 128)</option></select></div>
             <div id="uavList" class="uavlist"><p class="hint">Abrir este bloque consulta la lista de archivos en figshare.</p></div>
@@ -148,6 +154,20 @@
       </div>
 
       <div class="pane" id="p-deteccion" hidden>
+        <div id="nestBox" class="col" hidden>
+          <h3 class="first">Qué se busca en esta imagen de dron</h3>
+          <label class="check"><input id="nestOn" type="checkbox"> <span><b>Nidos</b>: discos oscuros de unos 65 cm sobre suelo sin nieve</span></label>
+          <label class="check"><input id="birdOn" type="checkbox"> <span><b>Pingüinos fuera del nido</b>: manchas oscuras chicas sobre la nieve</span></label>
+          <p class="callout" id="nestSum"></p>
+          <p class="hint"><b>Los dos conteos son borradores.</b> Tocar un círculo lo quita; tocar un nido sin marcar lo agrega. En esta fecha (octubre) casi todas las aves están sobre su nido; las manchas sobre la nieve pueden ser pingüinos caminando, pero también piedras o tierra.</p>
+          <div id="nestCtl" class="col">
+            <div class="slider"><label for="nestDiam">Diámetro del nido <output id="oNestD"></output></label><input id="nestDiam" type="range" min="0.4" max="0.8" step="0.01" value="0.65"></div>
+            <div class="slider"><label for="nestC">Exigencia para nidos <output id="oNestC"></output></label><input id="nestC" type="range" min="0.06" max="0.3" step="0.01" value="0.14"></div>
+            <div class="slider"><label for="birdK">Exigencia para pingüinos sobre la nieve <output id="oBirdK"></output></label><input id="birdK" type="range" min="4" max="30" step="1" value="12"></div>
+            <div class="row"><button class="btn" id="nestClear" type="button">Quitar mis correcciones</button><button class="btn" id="nestCsv" type="button">Bajar nidos y pingüinos (CSV)</button></div>
+          </div>
+          <h3>Color de guano</h3>
+        </div>
         <div class="seg" role="tablist" aria-label="Forma de detectar">
           <button role="tab" id="mRule" aria-selected="true" type="button">Automática</button>
           <button role="tab" id="mML" aria-selected="false" type="button">Con ejemplos</button>
@@ -194,17 +214,6 @@
           </details>
         </div>
 
-        <div id="nestBox" class="col" hidden>
-          <h3>Nidos (imágenes de dron)</h3>
-          <label class="check"><input id="nestOn" type="checkbox"> Contar nidos: discos oscuros sobre suelo sin nieve</label>
-          <div id="nestCtl" class="col" hidden>
-            <p class="callout" id="nestSum"></p>
-            <p class="hint"><b>El conteo automático es un borrador.</b> Tocar un círculo lo quita; tocar un nido sin marcar lo agrega. Así el número final es el que se revisó a mano.</p>
-            <div class="slider"><label for="nestDiam">Diámetro del nido <output id="oNestD"></output></label><input id="nestDiam" type="range" min="0.4" max="0.8" step="0.01" value="0.65"></div>
-            <div class="slider"><label for="nestC">Exigencia: cuánto más oscuro que su entorno <output id="oNestC"></output></label><input id="nestC" type="range" min="0.06" max="0.3" step="0.01" value="0.14"></div>
-            <div class="row"><button class="btn" id="nestClear" type="button">Quitar mis correcciones</button><button class="btn" id="nestCsv" type="button">Bajar los nidos (CSV)</button></div>
-          </div>
-        </div>
         <h3>Zona de análisis</h3>
         <label class="check" id="roiRow" hidden><input id="roiOn" type="checkbox"> <span id="roiLbl">Analizar sólo la zona de interés</span></label>
         <div class="row">
@@ -574,13 +583,13 @@
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>window.PC_WEB = true;</script>
-<script src="data.js?v=10"></script>
-<script src="engine.js?v=10"></script>
-<script src="app.js?v=10"></script>
-<script src="extra.js?v=10"></script>
+<script src="data.js?v=12"></script>
+<script src="engine.js?v=12"></script>
+<script src="app.js?v=12"></script>
+<script src="extra.js?v=12"></script>
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="tiempo.js?v=10"></script>
-<script src="sentinel.js?v=10"></script>
-<script src="ui.js?v=10"></script>
+<script src="tiempo.js?v=12"></script>
+<script src="sentinel.js?v=12"></script>
+<script src="ui.js?v=12"></script>
 </body>
 </html>

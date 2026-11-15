@@ -107,40 +107,67 @@
     [[a[0], a[1]], [mx, a[1]], [c[0], a[1]], [a[0], my], [c[0], my], [a[0], c[1]], [mx, c[1]], [c[0], c[1]]].forEach(function (h) { ctx.fillRect(h[0] - 5, h[1] - 5, 10, 10); ctx.strokeRect(h[0] - 5, h[1] - 5, 10, 10); });
     var g = PE.gsd(sc); if (g) { var t = nf0.format(Math.abs(b[2] - b[0]) * g) + ' × ' + nf0.format(Math.abs(b[3] - b[1]) * g) + ' m'; ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(5,13,16,.85)'; ctx.strokeText(t, a[0] + 2, a[1] - 4); ctx.fillStyle = '#ffe45c'; ctx.fillText(t, a[0] + 2, a[1] - 4); }
   }
-  /* ---------- nidos en imágenes de dron: borrador automático más corrección a mano ---------- */
-  var NEST = { on: false, diam: 0.65, c: 0.14, add: [], del: [], auto: 0 };
+  /* ---------- nidos y pingüinos en imágenes de dron: borrador automático más corrección a mano ---------- */
+  var FINE = 0.035;
+  var NEST = { on: false, birdOn: false, diam: 0.65, c: 0.14, bk: 12, bd: 0.35, add: [], del: [], auto: 0, birds: [], bdel: [] };
+  function snowFrac(sc, g) { // fracción de nieve alrededor de cada píxel (1 m), para saber qué está «sobre la nieve»
+    var N = sc.w * sc.h, m = sc.map, inv = 1 / sc.ref, R = sc.bands[m.r], G = sc.bands[m.g], B = sc.bands[m.b], f = new Float32Array(N);
+    for (var i = 0; i < N; i++) { var r = R[i] * inv, gg = G[i] * inv, b = B[i] * inv, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b); f[i] = (r + gg + b) / 3 > 0.5 && (mx - mn) / (mx + 1e-6) < 0.2 ? 1 : 0; }
+    var rr = Math.max(2, Math.round(1 / g)); return PE.boxBlur(PE.boxBlur(f, sc.w, sc.h, rr), sc.w, sc.h, rr);
+  }
   function nests(sc) {
-    var g = PE.gsd(sc); if (!NEST.on || !g || g > 0.15) return null;
-    var within = sc.roi && sc.roiOn ? sc.roi : null, rad = NEST.diam / g * 0.6;
-    var pts = PE.detectNests(sc, { diamPx: NEST.diam / g, c: NEST.c, within: within }); NEST.auto = pts.length;
-    pts = pts.filter(function (p) { return !NEST.del.some(function (d) { return Math.hypot(d[0] - p.x, d[1] - p.y) < rad; }); });
-    NEST.add.forEach(function (a) { pts.push({ x: a[0], y: a[1], s: 0, manual: true }); });
+    var g = PE.gsd(sc); NEST.birds = [];
+    if (!g || g > 0.15 || (!NEST.on && !NEST.birdOn)) return null;
+    var within = sc.roi && sc.roiOn ? sc.roi : null, rad = NEST.diam / g * 0.6, pts = [];
+    var fine = g <= FINE; // el borrador automático sólo sirve con mucho detalle; con menos, marca casi todo el suelo sin nieve
+    if (NEST.on) {
+      pts = fine ? PE.detectNests(sc, { diamPx: NEST.diam / g, c: NEST.c, within: within }) : []; NEST.auto = pts.length;
+      pts = pts.filter(function (p) { return !NEST.del.some(function (d) { return Math.hypot(d[0] - p.x, d[1] - p.y) < rad; }); });
+      NEST.add.forEach(function (a) { pts.push({ x: a[0], y: a[1], s: 0, manual: true }); });
+    }
+    if (NEST.birdOn && fine) {
+      var sf = snowFrac(sc, g), N = sc.w * sc.h, on = new Uint8Array(N); for (var i = 0; i < N; i++) on[i] = sf[i] > 0.75 && (!within || within[i]) ? 1 : 0;
+      var br = NEST.bd / g * 0.7;
+      NEST.birds = PE.detectBlobs(sc, { diamPx: NEST.bd / g, k: NEST.bk, within: on }).filter(function (p) { return !NEST.bdel.some(function (d) { return Math.hypot(d[0] - p.x, d[1] - p.y) < br + 2; }) && !pts.some(function (q) { return Math.hypot(q.x - p.x, q.y - p.y) < rad; }); });
+    }
     S.ind.diam = NEST.diam; return pts;
   }
   function tap(im) { // tocar un círculo lo quita; tocar fuera agrega un nido
-    if (!NEST.on || !S.blobs) return false;
-    var g = PE.gsd(S.scene), rad = NEST.diam / g * 0.6, best = -1, bd = rad;
-    S.blobs.forEach(function (b, i) { var d = Math.hypot(b.x - im[0], b.y - im[1]); if (d < bd) { bd = d; best = i; } });
+    var sc = S.scene, g = sc && PE.gsd(sc); if (!g || g > 0.15 || (!NEST.on && !NEST.birdOn)) return false;
+    var rad = NEST.diam / g * 0.6, best = -1, bd = rad, bi = -1, bb = Math.max(4, NEST.bd / g);
+    NEST.birds.forEach(function (b, i) { var d = Math.hypot(b.x - im[0], b.y - im[1]); if (d < bb) { bb = d; bi = i; } });
+    if (bi >= 0) { NEST.bdel.push([NEST.birds[bi].x, NEST.birds[bi].y]); A.schedule(0); return true; }
+    if (!NEST.on) return false;
+    (S.blobs || []).forEach(function (b, i) { var d = Math.hypot(b.x - im[0], b.y - im[1]); if (d < bd) { bd = d; best = i; } });
     if (best >= 0) { var b = S.blobs[best]; if (b.manual) NEST.add = NEST.add.filter(function (a) { return a[0] !== b.x || a[1] !== b.y; }); else NEST.del.push([b.x, b.y]); }
     else NEST.add.push([im[0], im[1]]);
     A.schedule(0); return true;
   }
   function nestUI() {
     var sc = S.scene, g = sc && PE.gsd(sc), can = !!g && g <= 0.15;
-    $('nestBox').hidden = !can; $('nestOn').checked = NEST.on; $('nestCtl').hidden = !NEST.on;
-    $('oNestD').textContent = String(NEST.diam.toFixed(2)).replace('.', ',') + ' m'; $('oNestC').textContent = String(NEST.c.toFixed(2)).replace('.', ',');
-    if (NEST.on && S.blobs) $('nestSum').textContent = nf0.format(S.blobs.length) + ' nidos marcados: ' + nf0.format(NEST.auto) + ' del borrador automático, ' + NEST.del.length + ' quitados y ' + NEST.add.length + ' agregados a mano.';
+    $('nestBox').hidden = !can; $('nestOn').checked = NEST.on; $('birdOn').checked = NEST.birdOn; $('nestCtl').hidden = !(NEST.on || NEST.birdOn); $('nestSum').hidden = !(NEST.on || NEST.birdOn);
+    $('oNestD').textContent = String(NEST.diam.toFixed(2)).replace('.', ',') + ' m'; $('oNestC').textContent = String(NEST.c.toFixed(2)).replace('.', ','); $('oBirdK').textContent = NEST.bk;
+    var t = [];
+    if (NEST.on && S.blobs) t.push(nf0.format(S.blobs.length) + ' nidos marcados (' + nf0.format(NEST.auto) + ' del borrador, ' + NEST.del.length + ' quitados y ' + NEST.add.length + ' agregados a mano)');
+    if (NEST.birdOn) t.push(nf0.format(NEST.birds.length) + ' posibles pingüinos sobre la nieve' + (NEST.bdel.length ? ' (' + NEST.bdel.length + ' quitados a mano)' : ''));
+    $('nestSum').textContent = g > FINE ? 'Esta imagen tiene ' + nf1.format(g * 100) + ' cm por píxel: un nido ocupa menos de 20 píxeles de ancho y el borrador automático marcaría casi todo el suelo sin nieve, así que está apagado. Se pueden marcar nidos a mano tocando la imagen (' + (S.blobs ? S.blobs.length : 0) + ' marcados), o abrir el recorte de detalle de 1,5 cm.' : t.join(' · ') + '.';
+    $('birdOn').disabled = g > FINE; $('nestC').disabled = $('birdK').disabled = g > FINE;
   }
-  $('nestOn').addEventListener('change', function () { NEST.on = this.checked; if (NEST.on) { S.ovStyle = 'edge'; $('ovStyle').value = 'edge'; } nestUI(); A.schedule(0); });
+  function nestSet() { if (NEST.on || NEST.birdOn) { S.ovStyle = 'edge'; $('ovStyle').value = 'edge'; } nestUI(); A.schedule(0); }
+  $('nestOn').addEventListener('change', function () { NEST.on = this.checked; nestSet(); });
+  $('birdOn').addEventListener('change', function () { NEST.birdOn = this.checked; nestSet(); });
   $('nestDiam').addEventListener('input', function () { NEST.diam = +this.value; nestUI(); A.schedule(150); });
   $('nestC').addEventListener('input', function () { NEST.c = +this.value; nestUI(); A.schedule(150); });
-  $('nestClear').addEventListener('click', function () { NEST.add = []; NEST.del = []; A.schedule(0); });
+  $('birdK').addEventListener('input', function () { NEST.bk = +this.value; nestUI(); A.schedule(150); });
+  $('nestClear').addEventListener('click', function () { NEST.add = []; NEST.del = []; NEST.bdel = []; A.schedule(0); });
   $('nestCsv').addEventListener('click', function () {
-    if (!S.blobs || !S.blobs.length) { A.toast('No hay nidos marcados.'); return; }
-    var rows = ['n,x_px,y_px,lon,lat,origen']; S.blobs.forEach(function (b, i) { var p = A.lonlat(b.x, b.y); rows.push([i + 1, (b.x * S.down).toFixed(1), (b.y * S.down).toFixed(1), p ? p[0].toFixed(7) : '', p ? p[1].toFixed(7) : '', b.manual ? 'a mano' : 'automático'].join(',')); });
-    A.save('nidos.csv', rows.join('\n'), 'text/csv');
+    var rows = ['n,clase,x_px,y_px,lon,lat,origen'], k = 0;
+    function put(b, cls) { var p = A.lonlat(b.x, b.y); rows.push([++k, cls, (b.x * S.down).toFixed(1), (b.y * S.down).toFixed(1), p ? p[0].toFixed(7) : '', p ? p[1].toFixed(7) : '', b.manual ? 'a mano' : 'automático'].join(',')); }
+    if (NEST.on) (S.blobs || []).forEach(function (b) { put(b, 'nido'); }); NEST.birds.forEach(function (b) { put(b, 'pingüino sobre la nieve'); });
+    if (!k) { A.toast('No hay nidos ni pingüinos marcados.'); return; }
+    A.save('nidos_y_pinguinos.csv', rows.join('\n'), 'text/csv');
   });
-  document.addEventListener('pc:scene', function () { var sc = S.scene, g = sc && PE.gsd(sc); NEST.add = []; NEST.del = []; NEST.on = !!g && g <= 0.05; if (NEST.on) { S.ovStyle = 'edge'; $('ovStyle').value = 'edge'; } nestUI(); });
+  document.addEventListener('pc:scene', function () { var sc = S.scene, g = sc && PE.gsd(sc); NEST.add = []; NEST.del = []; NEST.bdel = []; NEST.birds = []; NEST.on = NEST.birdOn = !!g && g <= 0.15; if (NEST.on) { S.ovStyle = 'edge'; $('ovStyle').value = 'edge'; } nestUI(); });
   document.addEventListener('pc:result', function () { setTimeout(nestUI, 0); });
 
   /* ---------- cobertura: cada píxel en una clase, con sus referencias ---------- */
@@ -153,6 +180,7 @@
     { k: 'guano', n: 'Color de guano', c: [255, 95, 162] },
     { k: 'nube', n: 'Nubes y sus sombras', c: [150, 150, 160] }
   ];
+  var NCOL = [255, 196, 0], BCOL = [255, 106, 20];
   function classify(sc) { // reglas simples y explícitas; con infrarrojo usa NDVI, NDWI y NDSI, sin él sólo el color
     var N = sc.w * sc.h, m = sc.map, inv = 1 / sc.ref, out = new Uint8Array(N), cnt = [0, 0, 0, 0, 0, 0, 0];
     var R = sc.bands[m.r], G = sc.bands[m.g], B = sc.bands[m.b], NIR = m.nir >= 0 ? sc.bands[m.nir] : null, SW = m.swir >= 0 ? sc.bands[m.swir] : null;
@@ -181,6 +209,10 @@
   function classImage(sc, d) { // color de la clase modulado por el brillo, para que se siga leyendo el relieve
     CL = classify(sc); var N = sc.w * sc.h, m = sc.map, inv = 1 / sc.ref, R = sc.bands[m.r], G = sc.bands[m.g], B = sc.bands[m.b];
     for (var i = 0; i < N; i++) { var c = CLS[CL.map[i]].c, L = Math.min(1, (R[i] + G[i] + B[i]) * inv / 3), k = CL.map[i] === 2 ? 0.8 + 0.2 * L : 0.55 + 0.6 * Math.sqrt(L), j = i * 4; d[j] = Math.min(255, c[0] * k); d[j + 1] = Math.min(255, c[1] * k); d[j + 2] = Math.min(255, c[2] * k); d[j + 3] = 255; }
+    var g = PE.gsd(sc); if (!g) return;
+    function disc(p, rad, col) { var x0 = Math.max(0, Math.floor(p.x - rad)), x1 = Math.min(sc.w - 1, Math.ceil(p.x + rad)), y0 = Math.max(0, Math.floor(p.y - rad)), y1 = Math.min(sc.h - 1, Math.ceil(p.y + rad)); for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) if ((x + 0.5 - p.x) * (x + 0.5 - p.x) + (y + 0.5 - p.y) * (y + 0.5 - p.y) <= rad * rad) { var q = (y * sc.w + x) * 4; d[q] = col[0]; d[q + 1] = col[1]; d[q + 2] = col[2]; } }
+    if (NEST.on && S.blobs) S.blobs.forEach(function (p) { disc(p, NEST.diam / g / 2, NCOL); });
+    NEST.birds.forEach(function (p) { disc(p, Math.max(1.5, NEST.bd / g / 2), BCOL); });
   }
   function sw(css, txt, cls) { var r = document.createElement('div'); r.className = 'legrow'; var i = document.createElement('i'); i.className = cls || ''; i.style.cssText = css; r.appendChild(i); r.appendChild(document.createTextNode(txt)); return r; }
   function legend() {
@@ -192,7 +224,10 @@
       CLS.forEach(function (k, i) { if (!i || !CL.cnt[i]) return; var p = 100 * CL.cnt[i] / tot, a = g ? CL.cnt[i] * sc.pxArea : 0; box.appendChild(sw('background:rgb(' + k.c.join(',') + ')', k.n + ' · ' + (p < 0.1 ? 'menos de 0,1' : p < 1 ? nf1.format(p) : nf0.format(p)) + ' %' + (g ? ' · ' + (a >= 1e4 ? nf1.format(a / 1e4) + ' ha' : nf0.format(a) + ' m²') : ''))); });
       var n = document.createElement('p'); n.className = 'legnote'; n.textContent = (sc.map.nir >= 0 ? 'Con infrarrojo: índices de agua, nieve y vegetación' + (sc.scl ? ', y la clasificación de nubes de Sentinel-2' : '') + '.' : 'Imagen sin infrarrojo: clases sólo por color y brillo; son aproximadas.') + ' Porcentajes sobre toda la imagen.'; box.appendChild(n);
     } else box.appendChild(sw('background:#8fd8ea;border:1.5px solid #fff', 'Celeste: tiene color de guano'));
-    if (c.blobs) box.appendChild(sw('border:2px solid #ffe45c;border-radius:50%;background:none', NEST.on ? 'Círculo amarillo: nido marcado' : 'Círculo amarillo: ave contada'));
+    var g2 = PE.gsd(sc);
+    if (NEST.on && c.blobs) box.appendChild(sw(on ? 'background:rgb(' + NCOL.join(',') + ');border-radius:50%' : 'border:2px solid #ffe45c;border-radius:50%;background:none', 'Nidos: ' + nf0.format(c.blobs.length) + (g2 ? ' · ' + nf0.format(c.blobs.length * Math.PI * NEST.diam * NEST.diam / 4) + ' m²' : '')));
+    else if (c.blobs) box.appendChild(sw('border:2px solid #ffe45c;border-radius:50%;background:none', 'Círculo amarillo: ave contada'));
+    if (NEST.birdOn && g2 && g2 <= FINE) box.appendChild(sw('background:rgb(' + BCOL.join(',') + ');border-radius:50%', 'Pingüinos fuera del nido (posibles): ' + nf0.format(NEST.birds.length)));
     if (sc.roi && sc.roiOn) box.appendChild(sw('border:2px dashed #ffe45c;background:none', 'Recuadro de trazos: zona analizada'));
     if (c.res.comps.length) box.appendChild(sw('background:#f0c419', 'Amarillo: grupo elegido'));
     if (c.res.comps.some(function (k) { return k.isNew; })) box.appendChild(sw('border:2px solid #ff9d2e;border-radius:50%;background:none', 'Anillo naranja: grupo nuevo'));
@@ -211,7 +246,8 @@
   });
   var over0 = over;
   over = function (ctx, P) { // cuando la imagen se ve chica, su contorno y su nombre
-    var sc = S.scene; if (sc && sc.geo) { var a = P(0, 0), b = P(sc.w, sc.h); if (b[0] - a[0] < 260) { ctx.strokeStyle = '#ffe45c'; ctx.lineWidth = 2; ctx.strokeRect(a[0] - 3, a[1] - 3, b[0] - a[0] + 6, b[1] - a[1] + 6); ctx.font = '600 12px "IBM Plex Sans", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; var t = 'Acá está la imagen (' + nf0.format(sc.w * PE.gsd(sc)) + ' m de ancho)'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(5,13,16,.9)'; ctx.strokeText(t, a[0], a[1] - 8); ctx.fillStyle = '#ffe45c'; ctx.fillText(t, a[0], a[1] - 8); } }
+    var sc = S.scene;
+    if (sc && S.ovOn && NEST.birds.length) { var gb = PE.gsd(sc), rb = Math.max(3, NEST.bd / gb * S.view.k * 0.7); ctx.strokeStyle = 'rgb(' + BCOL.join(',') + ')'; ctx.lineWidth = 2; NEST.birds.forEach(function (b) { var p = P(b.x, b.y); ctx.beginPath(); ctx.arc(p[0], p[1], rb, 0, 6.2832); ctx.stroke(); }); } if (sc && sc.geo) { var a = P(0, 0), b = P(sc.w, sc.h); if (b[0] - a[0] < 260) { ctx.strokeStyle = '#ffe45c'; ctx.lineWidth = 2; ctx.strokeRect(a[0] - 3, a[1] - 3, b[0] - a[0] + 6, b[1] - a[1] + 6); ctx.font = '600 12px "IBM Plex Sans", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; var t = 'Acá está la imagen (' + nf0.format(sc.w * PE.gsd(sc)) + ' m de ancho)'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(5,13,16,.9)'; ctx.strokeText(t, a[0], a[1] - 8); ctx.fillStyle = '#ffe45c'; ctx.fillText(t, a[0], a[1] - 8); } }
     over0(ctx, P);
   };
   window.PCX = { classImage: classImage, classify: classify, under: under, over: function (c, P) { over(c, P); }, down: down, move: move, up: up, state: X, nests: nests, tap: tap, nest: NEST };

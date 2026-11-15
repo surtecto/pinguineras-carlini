@@ -391,3 +391,4 @@ body.app { grid-template-columns: minmax(0, 1fr); }
 .maplegend .btn { background: #e2edef; color: #0a161b; border-color: #e2edef; padding: 5px 9px; font-size: 12px; align-self: flex-start; }
 .maplegend .btn[aria-pressed="true"] { background: #ffe45c; border-color: #ffe45c; }
 @media (max-width: 900px) { .maplegend { bottom: 40px; font-size: 11px; max-width: 70%; } }
+.pane h3.first { margin-top: 0; padding-top: 0; border-top: 0; }
