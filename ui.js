@@ -14,7 +14,8 @@
   }
   function showPane(p) {
     Array.prototype.forEach.call($('subTabs').querySelectorAll('button'), function (b) { b.setAttribute('aria-selected', String(b.dataset.pane === p)); });
-    ['imagen', 'deteccion', 'resultado', 'ajustes'].forEach(function (k) { $('p-' + k).hidden = k !== p; });
+    ['imagen', 'deteccion', 'clasificar', 'resultado', 'ajustes'].forEach(function (k) { $('p-' + k).hidden = k !== p; });
+    document.dispatchEvent(new CustomEvent('pc:pane', { detail: p }));
   }
   $('mainTabs').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) showView(b.dataset.view); });
   $('subTabs').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) showPane(b.dataset.pane); });
@@ -63,8 +64,9 @@
     else if (sc.parent) msg = 'Recorte a resolución completa de la zona marcada. ' + msg + ' «Volver a la imagen completa» está en «Detección».';
     diag.textContent = msg;
     hint.innerHTML = '';
-    var px = window.PCX && window.PCX.state;
-    if (px && px.edit) { hint.textContent = px.fresh ? 'Dibujar la zona: arrastrar sobre la imagen de una esquina a la opuesta.' : 'Editando la zona: arrastrar los cuadraditos para cambiar el tamaño, o el interior para moverla. Fuera del recuadro se mueve la imagen.'; hint.hidden = false; }
+    var px = window.PCX && window.PCX.state, sh = window.PCSup && window.PCSup.hint();
+    if (sh) { var di = document.createElement('i'); di.style.background = sh[0]; hint.appendChild(di); hint.appendChild(document.createTextNode(sh[1])); hint.hidden = false; }
+    else if (px && px.edit) { hint.textContent = px.fresh ? 'Dibujar la zona: arrastrar sobre la imagen de una esquina a la opuesta.' : 'Editando la zona: arrastrar los cuadraditos para cambiar el tamaño, o el interior para moverla. Fuera del recuadro se mueve la imagen.'; hint.hidden = false; }
     else if ($('toolMeasure').getAttribute('aria-pressed') === 'true') { hint.textContent = 'Medir: tocar los dos extremos de una distancia conocida.'; hint.hidden = false; }
     else if (ml) {
       var dot = document.createElement('i'); dot.style.background = c.cls === 'guano' ? '#ff5fa2' : '#ffd23f'; hint.appendChild(dot);

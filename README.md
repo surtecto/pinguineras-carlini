@@ -29,6 +29,7 @@ Es una herramienta de exploración, **sin validación de campo**. A 10 m por pí
 | `sentinel.js` | Escenas Sentinel-2 incluidas y lectura en vivo del archivo |
 | `ui.js` | Pestañas, panel de tres pasos y franja de estado |
 | `extra.js` | Base Esri bajo la imagen, zona de análisis editable, fichas por grupo, lista de ortomosaicos de dron |
+| `supervisada.js` | Clasificación supervisada: clases, ejemplos marcados sobre la imagen, mapa clasificado y superficies |
 | `data.js` | Censos (MAPPPD) y línea de costa (Natural Earth) |
 | `datos/` | Recortes Sentinel-2, relieve Copernicus DEM, catálogo y serie inicial |
 | `vendor/geotiff.js` | Lector GeoTIFF (geotiff.js 2.1.3, licencia MIT) |

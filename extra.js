@@ -133,6 +133,7 @@
     S.ind.diam = NEST.diam; return pts;
   }
   function tap(im) { // tocar un círculo lo quita; tocar fuera agrega un nido
+    if (window.PCSup && window.PCSup.tap(im)) return true;
     var sc = S.scene, g = sc && PE.gsd(sc); if (!g || g > 0.15 || (!NEST.on && !NEST.birdOn)) return false;
     var rad = NEST.diam / g * 0.6, best = -1, bd = rad, bi = -1, bb = Math.max(4, NEST.bd / g);
     NEST.birds.forEach(function (b, i) { var d = Math.hypot(b.x - im[0], b.y - im[1]); if (d < bb) { bb = d; bi = i; } });
@@ -232,6 +233,7 @@
     if (c.res.comps.length && on) box.appendChild(sw('border:2px solid #fff;background:rgb(255,64,150)', 'Borde blanco y número: cada grupo detectado'));
     if (c.res.comps.length && !on) box.appendChild(sw('background:#f0c419', 'Amarillo: grupo elegido'));
     if (c.res.comps.some(function (k) { return k.isNew; })) box.appendChild(sw('border:2px solid #ff9d2e;border-radius:50%;background:none', 'Anillo naranja: grupo nuevo'));
+    if (window.PCSup) window.PCSup.legend(box, sw);
     if (X.base && sc.geo) box.appendChild(sw('background:linear-gradient(135deg,#31404a,#6b7a80)', 'Alrededor: base satelital de Esri'));
   }
   $('clsBtn').addEventListener('click', function () { var m = $('mode'); m.value = S.mode === 'cls' ? 'rgb' : 'cls'; m.dispatchEvent(new Event('change', { bubbles: true })); m.dispatchEvent(new Event('input', { bubbles: true })); setTimeout(legend, 30); });
@@ -248,10 +250,11 @@
   var over0 = over;
   over = function (ctx, P) { // cuando la imagen se ve chica, su contorno y su nombre
     var sc = S.scene;
+    if (window.PCSup) window.PCSup.paint(ctx, P);
     if (sc && S.ovOn && NEST.birds.length) { var gb = PE.gsd(sc), rb = Math.max(3, NEST.bd / gb * S.view.k * 0.7); ctx.strokeStyle = 'rgb(' + BCOL.join(',') + ')'; ctx.lineWidth = 2; NEST.birds.forEach(function (b) { var p = P(b.x, b.y); ctx.beginPath(); ctx.arc(p[0], p[1], rb, 0, 6.2832); ctx.stroke(); }); } if (sc && sc.geo) { var a = P(0, 0), b = P(sc.w, sc.h); if (b[0] - a[0] < 260) { ctx.strokeStyle = '#ffe45c'; ctx.lineWidth = 2; ctx.strokeRect(a[0] - 3, a[1] - 3, b[0] - a[0] + 6, b[1] - a[1] + 6); ctx.font = '600 12px "IBM Plex Sans", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; var t = 'Acá está la imagen (' + nf0.format(sc.w * PE.gsd(sc)) + ' m de ancho)'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(5,13,16,.9)'; ctx.strokeText(t, a[0], a[1] - 8); ctx.fillStyle = '#ffe45c'; ctx.fillText(t, a[0], a[1] - 8); } }
     over0(ctx, P);
   };
-  window.PCX = { classImage: classImage, classify: classify, under: under, over: function (c, P) { over(c, P); }, down: down, move: move, up: up, state: X, nests: nests, tap: tap, nest: NEST };
+  window.PCX = { legend: legend, classImage: classImage, classify: classify, under: under, over: function (c, P) { over(c, P); }, down: down, move: move, up: up, state: X, nests: nests, tap: tap, nest: NEST };
 
   /* ---------- fichas por grupo ---------- */
   function signal(sc, c, L) { // cuántos desvíos del suelo común se aparta el grupo en rojo y en rosado

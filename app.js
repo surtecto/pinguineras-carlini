@@ -299,6 +299,7 @@
           if (!S.samples.some(function (q) { return q.cls !== 'guano'; })) warn = 'Sólo marcaste guano. Si se pintó de más, elegir «Esto no es guano» y tocar esas partes.';
         }
       }
+      if (window.PCSup && window.PCSup.mask) { var sm = window.PCSup.mask(sc); if (sm) { raw = sm; warn = ''; } } // la clase «Guano» de la clasificación supervisada como detección
       if (sc.roi && sc.roiOn) { for (var z = 0; z < raw.length; z++) if (raw[z] && !sc.roi[z]) raw[z] = 0; }
       if (S.terr.on && sc.terrain) { var SL = sc.terrain.slope, EL = sc.elev; for (var q = 0; q < raw.length; q++) if (raw[q] && (SL[q] > S.terr.slope || EL[q] > S.terr.elev)) raw[q] = 0; }
       var m = PE.morph(raw, sc.w, sc.h, S.open, S.close);

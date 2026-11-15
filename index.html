@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="style.css?v=13">
+<link rel="stylesheet" href="style.css?v=14">
 </head>
 <body class="app">
 
@@ -95,6 +95,7 @@
       <nav class="subtabs" id="subTabs" role="tablist" aria-label="Pasos">
         <button role="tab" type="button" data-pane="imagen" aria-selected="true"><b>1</b>Imagen</button>
         <button role="tab" type="button" data-pane="deteccion" aria-selected="false"><b>2</b>Detección</button>
+        <button role="tab" type="button" data-pane="clasificar" aria-selected="false">Clasificar</button>
         <button role="tab" type="button" data-pane="resultado" aria-selected="false"><b>3</b>Resultado</button>
         <button role="tab" type="button" data-pane="ajustes" aria-selected="false">Ajustes</button>
       </nav>
@@ -232,6 +233,28 @@
             <div class="field"><label for="minArea" id="minAreaLbl">Superficie mínima de un grupo (m²)</label><input id="minArea" type="number" min="0" step="any" inputmode="decimal"></div>
           </div>
         </details>
+      </div>
+
+      <div class="pane" id="p-clasificar" hidden>
+        <h3 class="first">Clasificación supervisada</h3>
+        <ol class="howto">
+          <li>Elegir una clase de la lista.</li>
+          <li>Tocar en la imagen varios lugares que sean de esa clase. Cada toque toma un circulito de muestra.</li>
+          <li>Repetir con dos clases o más. La app aprende de esos ejemplos y clasifica toda la imagen.</li>
+        </ol>
+        <div class="supcls" id="supClasses" role="radiogroup" aria-label="Clase que se está marcando"></div>
+        <div class="row"><input id="supName" type="text" placeholder="Otra clase: nombre" aria-label="Nombre de una clase nueva"><button class="btn" id="supAdd" type="button">Agregar clase</button></div>
+        <div class="slider"><label for="supBrush">Tamaño de cada toque <output id="oSupBrush"></output></label><input id="supBrush" type="range" min="1" max="12" step="1" value="2"></div>
+        <div class="row"><button class="btn" id="supUndo" type="button">Deshacer el último toque</button><button class="btn" id="supClear" type="button">Borrar los ejemplos</button></div>
+        <p class="callout" id="supMsg">Todavía no hay ejemplos. Elegir una clase y tocar la imagen.</p>
+        <div class="ovgroup"><label class="check inline"><input id="supShow" type="checkbox" checked> Ver la clasificación sobre la imagen</label>
+          <div class="slider inline"><label for="supA" class="visually-hidden">Transparencia</label><input id="supA" type="range" min="0.2" max="1" step="0.05" value="0.75"></div></div>
+        <h3>Superficie de cada clase</h3>
+        <div class="tablewrap"><table id="supTbl"><thead><tr><th>Clase</th><th>Ejemplos</th><th>Superficie</th><th>%</th></tr></thead><tbody></tbody></table></div>
+        <label class="check"><input id="supUse" type="checkbox"> Usar la clase «Guano» como detección: sus manchas pasan a ser los grupos de «Resultado»</label>
+        <h3>Guardar</h3>
+        <div class="row"><button class="btn" id="supPng" type="button">Mapa clasificado (PNG)</button><button class="btn" id="supCsv" type="button">Superficies (CSV)</button><button class="btn" id="supJson" type="button">Ejemplos (JSON)</button></div>
+        <p class="hint">Clasificador de máxima verosimilitud gaussiana: para cada clase calcula el color medio y su variación a partir de los ejemplos, y asigna cada píxel a la clase más parecida. Con infrarrojo usa cinco bandas; sin él, las tres del color. La calidad depende de los ejemplos: conviene marcar varios por clase y en lugares distintos.</p>
       </div>
 
       <div class="pane" id="p-resultado" hidden>
@@ -583,13 +606,14 @@
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>window.PC_WEB = true;</script>
-<script src="data.js?v=13"></script>
-<script src="engine.js?v=13"></script>
-<script src="app.js?v=13"></script>
-<script src="extra.js?v=13"></script>
+<script src="data.js?v=14"></script>
+<script src="engine.js?v=14"></script>
+<script src="app.js?v=14"></script>
+<script src="extra.js?v=14"></script>
+<script src="supervisada.js?v=14"></script>
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="tiempo.js?v=13"></script>
-<script src="sentinel.js?v=13"></script>
-<script src="ui.js?v=13"></script>
+<script src="tiempo.js?v=14"></script>
+<script src="sentinel.js?v=14"></script>
+<script src="ui.js?v=14"></script>
 </body>
 </html>
