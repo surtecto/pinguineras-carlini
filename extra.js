@@ -177,7 +177,7 @@
     { k: 'nieve', n: 'Nieve y hielo', c: [236, 244, 250] },
     { k: 'veg', n: 'Vegetación: musgos y líquenes', c: [74, 158, 74] },
     { k: 'roca', n: 'Roca y suelo sin nieve', c: [150, 128, 104] },
-    { k: 'guano', n: 'Color de guano', c: [255, 95, 162] },
+    { k: 'guano', n: 'Guano detectado', c: [255, 64, 150] },
     { k: 'nube', n: 'Nubes y sus sombras', c: [150, 150, 160] }
   ];
   var NCOL = [255, 196, 0], BCOL = [255, 106, 20];
@@ -208,7 +208,7 @@
   var CL = null;
   function classImage(sc, d) { // color de la clase modulado por el brillo, para que se siga leyendo el relieve
     CL = classify(sc); var N = sc.w * sc.h, m = sc.map, inv = 1 / sc.ref, R = sc.bands[m.r], G = sc.bands[m.g], B = sc.bands[m.b];
-    for (var i = 0; i < N; i++) { var c = CLS[CL.map[i]].c, L = Math.min(1, (R[i] + G[i] + B[i]) * inv / 3), k = CL.map[i] === 2 ? 0.8 + 0.2 * L : 0.55 + 0.6 * Math.sqrt(L), j = i * 4; d[j] = Math.min(255, c[0] * k); d[j + 1] = Math.min(255, c[1] * k); d[j + 2] = Math.min(255, c[2] * k); d[j + 3] = 255; }
+    for (var i = 0; i < N; i++) { var c = CLS[CL.map[i]].c, L = Math.min(1, (R[i] + G[i] + B[i]) * inv / 3), k = CL.map[i] === 2 ? 0.8 + 0.2 * L : CL.map[i] === 5 ? 1 : 0.55 + 0.6 * Math.sqrt(L), j = i * 4; d[j] = Math.min(255, c[0] * k); d[j + 1] = Math.min(255, c[1] * k); d[j + 2] = Math.min(255, c[2] * k); d[j + 3] = 255; }
     var g = PE.gsd(sc); if (!g) return;
     function disc(p, rad, col) { var x0 = Math.max(0, Math.floor(p.x - rad)), x1 = Math.min(sc.w - 1, Math.ceil(p.x + rad)), y0 = Math.max(0, Math.floor(p.y - rad)), y1 = Math.min(sc.h - 1, Math.ceil(p.y + rad)); for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) if ((x + 0.5 - p.x) * (x + 0.5 - p.x) + (y + 0.5 - p.y) * (y + 0.5 - p.y) <= rad * rad) { var q = (y * sc.w + x) * 4; d[q] = col[0]; d[q + 1] = col[1]; d[q + 2] = col[2]; } }
     if (NEST.on && S.blobs) S.blobs.forEach(function (p) { disc(p, NEST.diam / g / 2, NCOL); });
@@ -229,7 +229,8 @@
     else if (c.blobs) box.appendChild(sw('border:2px solid #ffe45c;border-radius:50%;background:none', 'Círculo amarillo: ave contada'));
     if (NEST.birdOn && g2 && g2 <= FINE) box.appendChild(sw('background:rgb(' + BCOL.join(',') + ');border-radius:50%', 'Pingüinos fuera del nido (posibles): ' + nf0.format(NEST.birds.length)));
     if (sc.roi && sc.roiOn) box.appendChild(sw('border:2px dashed #ffe45c;background:none', 'Recuadro de trazos: zona analizada'));
-    if (c.res.comps.length) box.appendChild(sw('background:#f0c419', 'Amarillo: grupo elegido'));
+    if (c.res.comps.length && on) box.appendChild(sw('border:2px solid #fff;background:rgb(255,64,150)', 'Borde blanco y número: cada grupo detectado'));
+    if (c.res.comps.length && !on) box.appendChild(sw('background:#f0c419', 'Amarillo: grupo elegido'));
     if (c.res.comps.some(function (k) { return k.isNew; })) box.appendChild(sw('border:2px solid #ff9d2e;border-radius:50%;background:none', 'Anillo naranja: grupo nuevo'));
     if (X.base && sc.geo) box.appendChild(sw('background:linear-gradient(135deg,#31404a,#6b7a80)', 'Alrededor: base satelital de Esri'));
   }

@@ -441,7 +441,7 @@
     if (window.PCX) { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); window.PCX.under(ctx, r); ctx.setTransform(dpr * v.k, 0, 0, dpr * v.k, dpr * v.x, dpr * v.y); }
     ctx.imageSmoothingEnabled = v.k < 3;
     ctx.globalAlpha = S.imgA === undefined ? 1 : S.imgA; ctx.drawImage(base, 0, 0); ctx.globalAlpha = 1;
-    if (S.ovOn && S.res) { ctx.globalAlpha = S.ovStyle === 'edge' ? 0 : S.ovA; ctx.drawImage(fill, 0, 0); ctx.globalAlpha = Math.min(1, S.ovA + 0.45); ctx.drawImage(edge, 0, 0); ctx.globalAlpha = 1; }
+    if (S.ovOn && S.res) { ctx.globalAlpha = S.ovStyle === 'edge' || S.mode === 'cls' ? 0 : S.ovA; ctx.drawImage(fill, 0, 0); ctx.globalAlpha = Math.min(1, S.ovA + 0.45); ctx.drawImage(edge, 0, 0); ctx.globalAlpha = 1; }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     function P(x, y) { return [x * v.k + v.x, y * v.k + v.y]; }
     if (S.ovOn && S.res) {
