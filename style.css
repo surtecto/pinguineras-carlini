@@ -379,3 +379,15 @@ body.app { grid-template-columns: minmax(0, 1fr); }
 #v-detectar .toolbar .ovgroup { flex: none; display: flex; align-items: center; gap: 8px; }
 #ovStyle { width: 128px; }
 #v-detectar .toolbar .slider.inline input { width: 64px; }
+
+/* ============ referencias sobre la imagen ============ */
+.maplegend { position: absolute; left: 10px; bottom: 44px; max-width: min(330px, calc(100% - 20px)); background: rgba(10, 22, 27, .9); color: #e2edef; border-radius: 5px; padding: 6px 9px 8px; font: 12px/1.35 var(--body); display: flex; flex-direction: column; gap: 5px; z-index: 3; }
+#legToggle { all: unset; cursor: pointer; font: 600 10.5px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #9fd3e0; }
+#legToggle::after { content: ' ▾'; } #legToggle[aria-expanded="false"]::after { content: ' ▸'; }
+#legBody { display: flex; flex-direction: column; gap: 3px; }
+.legrow { display: flex; align-items: center; gap: 7px; }
+.legrow i { flex: none; width: 13px; height: 13px; border-radius: 2px; box-sizing: border-box; }
+.legnote { margin: 3px 0 0; font-size: 11px; color: #a9bcc2; }
+.maplegend .btn { background: #e2edef; color: #0a161b; border-color: #e2edef; padding: 5px 9px; font-size: 12px; align-self: flex-start; }
+.maplegend .btn[aria-pressed="true"] { background: #ffe45c; border-color: #ffe45c; }
+@media (max-width: 900px) { .maplegend { bottom: 40px; font-size: 11px; max-width: 70%; } }

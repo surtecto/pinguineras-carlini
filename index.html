@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body class="app">
 
@@ -45,6 +45,11 @@
         <div class="hintbar" id="hintbar" hidden></div>
         <div class="busy" id="busy" hidden><span id="busyTxt">Procesando…</span></div>
         <div class="drop" id="drop" hidden>Soltar la imagen aquí</div>
+        <div class="maplegend" id="mapLegend">
+          <button type="button" id="legToggle" aria-expanded="true">Referencias</button>
+          <div id="legBody"></div>
+          <button type="button" class="btn" id="clsBtn" aria-pressed="false">Clasificar toda la imagen</button>
+        </div>
         <div class="scalebar" id="scalebar" hidden><span id="scaleTxt"></span><i id="scaleLine"></i></div>
         <p class="basecredit" id="baseCredit" hidden>Base: Esri World Imagery (Esri, Earthstar Geographics), unos 10 m por píxel en este sector</p>
         <div class="zoom">
@@ -59,6 +64,7 @@
         <div class="field inline"><label for="mode">Ver como</label>
           <select id="mode">
             <option value="rgb">Color</option>
+            <option value="cls">Cobertura: qué es cada cosa</option>
             <option value="cir">Falso color infrarrojo</option>
             <option value="ri">Enrojecimiento</option>
             <option value="ax">Tinte rosado</option>
@@ -568,13 +574,13 @@
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>window.PC_WEB = true;</script>
-<script src="data.js?v=9"></script>
-<script src="engine.js?v=9"></script>
-<script src="app.js?v=9"></script>
-<script src="extra.js?v=9"></script>
+<script src="data.js?v=10"></script>
+<script src="engine.js?v=10"></script>
+<script src="app.js?v=10"></script>
+<script src="extra.js?v=10"></script>
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="tiempo.js?v=9"></script>
-<script src="sentinel.js?v=9"></script>
-<script src="ui.js?v=9"></script>
+<script src="tiempo.js?v=10"></script>
+<script src="sentinel.js?v=10"></script>
+<script src="ui.js?v=10"></script>
 </body>
 </html>

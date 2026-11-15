@@ -320,7 +320,8 @@
   }
   function renderBase() {
     var sc = S.scene, g = base.getContext('2d'), id = g.createImageData(sc.w, sc.h);
-    PE.renderBase(sc, S.mode, S.gamma, id.data); g.putImageData(id, 0, 0);
+    if (S.mode === 'cls' && window.PCX && window.PCX.classImage) window.PCX.classImage(sc, id.data); else PE.renderBase(sc, S.mode, S.gamma, id.data);
+    g.putImageData(id, 0, 0);
   }
   function paintOverlay() {
     var sc = S.scene, w = sc.w, h = sc.h, N = w * h, L = S.res.labels;
@@ -716,7 +717,7 @@
     catch (e) { toast(e && e.message ? e.message : 'No se pudo leer el recorte.'); }
     busy(null);
   }
-  window.PCApp = { loadFile: loadFile, S: S, draw: draw, schedule: schedule, selectComp: selectComp, lonlat: lonlat, layers: { base: base, fill: fill, edge: edge }, cutFull: cutFull, cv: cv, nf0: nf0, toast: toast, save: save, fmtLen: fmtLen, busy: busy, setScene: setScene, ensureGeoTIFF: ensureGeoTIFF, fitView: fitView,
+  window.PCApp = { renderBase: renderBase, loadFile: loadFile, S: S, draw: draw, schedule: schedule, selectComp: selectComp, lonlat: lonlat, layers: { base: base, fill: fill, edge: edge }, cutFull: cutFull, cv: cv, nf0: nf0, toast: toast, save: save, fmtLen: fmtLen, busy: busy, setScene: setScene, ensureGeoTIFF: ensureGeoTIFF, fitView: fitView,
     demo: function () { demo(PE.demoSatellite, 'Generando la escena de ejemplo…'); setTimeout(function () { fitView(true); }, 400); },
     current: function () { if (!S.scene || !S.res) return null; var t = totals(); return { scene: S.scene, res: S.res, px: t.px, m2: t.m2, dens: S.dens, method: S.method, gsd: PE.gsd(S.scene), samples: S.samples, cls: S.cls, blobs: S.blobs }; } };
 })();

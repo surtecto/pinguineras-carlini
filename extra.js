@@ -143,6 +143,66 @@
   document.addEventListener('pc:scene', function () { var sc = S.scene, g = sc && PE.gsd(sc); NEST.add = []; NEST.del = []; NEST.on = !!g && g <= 0.05; if (NEST.on) { S.ovStyle = 'edge'; $('ovStyle').value = 'edge'; } nestUI(); });
   document.addEventListener('pc:result', function () { setTimeout(nestUI, 0); });
 
+  /* ---------- cobertura: cada píxel en una clase, con sus referencias ---------- */
+  var CLS = [
+    { k: 'nodata', n: 'Sin dato', c: [20, 26, 30] },
+    { k: 'agua', n: 'Agua: mar y lagunas', c: [38, 98, 168] },
+    { k: 'nieve', n: 'Nieve y hielo', c: [236, 244, 250] },
+    { k: 'veg', n: 'Vegetación: musgos y líquenes', c: [74, 158, 74] },
+    { k: 'roca', n: 'Roca y suelo sin nieve', c: [150, 128, 104] },
+    { k: 'guano', n: 'Color de guano', c: [255, 95, 162] },
+    { k: 'nube', n: 'Nubes y sus sombras', c: [150, 150, 160] }
+  ];
+  function classify(sc) { // reglas simples y explícitas; con infrarrojo usa NDVI, NDWI y NDSI, sin él sólo el color
+    var N = sc.w * sc.h, m = sc.map, inv = 1 / sc.ref, out = new Uint8Array(N), cnt = [0, 0, 0, 0, 0, 0, 0];
+    var R = sc.bands[m.r], G = sc.bands[m.g], B = sc.bands[m.b], NIR = m.nir >= 0 ? sc.bands[m.nir] : null, SW = m.swir >= 0 ? sc.bands[m.swir] : null;
+    var mask = S.res && S.res.mask, scl = sc.scl, V = sc.valid, ru = S.rule;
+    for (var i = 0; i < N; i++) {
+      var r = R[i] * inv, g = G[i] * inv, b = B[i] * inv, L = (r + g + b) / 3, c;
+      if (scl && (scl[i] === 3 || scl[i] === 8 || scl[i] === 9 || scl[i] === 10)) c = 6;
+      else if ((V && !V[i] && !(scl && scl[i])) || (r === 0 && g === 0 && b === 0)) c = 0;
+      else if (mask && mask[i]) c = 5;
+      else if (NIR) {
+        var n = NIR[i] * inv, ndvi = (n - r) / (n + r + 1e-9), ndwi = (g - n) / (g + n + 1e-9), ndsi = SW ? (g - SW[i] * inv) / (g + SW[i] * inv + 1e-9) : -1;
+        if ((scl && scl[i] === 11) || (ndsi > 0.4 && L > 0.25)) c = 2;
+        else if ((scl && scl[i] === 6) || ndwi > ru.ndwi) c = 1;
+        else if (ndvi > ru.ndvi) c = 3; else c = 4;
+      } else {
+        var mx = Math.max(r, g, b), mn = Math.min(r, g, b), sat = (mx - mn) / (mx + 1e-6);
+        if (L > 0.5 && sat < 0.2) c = 2;
+        else if (L > 0.15 && (2 * g - r - b) / (r + g + b + 1e-6) > 0.08) c = 3;
+        else if (L > 0.12 && L < 0.5 && b > r * 1.2 && b > g * 1.04) c = 1; else c = 4; // lo muy oscuro es suelo: su tinte no alcanza para decidir
+      }
+      out[i] = c; cnt[c]++;
+    }
+    return { map: out, cnt: cnt };
+  }
+  var CL = null;
+  function classImage(sc, d) { // color de la clase modulado por el brillo, para que se siga leyendo el relieve
+    CL = classify(sc); var N = sc.w * sc.h, m = sc.map, inv = 1 / sc.ref, R = sc.bands[m.r], G = sc.bands[m.g], B = sc.bands[m.b];
+    for (var i = 0; i < N; i++) { var c = CLS[CL.map[i]].c, L = Math.min(1, (R[i] + G[i] + B[i]) * inv / 3), k = CL.map[i] === 2 ? 0.8 + 0.2 * L : 0.55 + 0.6 * Math.sqrt(L), j = i * 4; d[j] = Math.min(255, c[0] * k); d[j + 1] = Math.min(255, c[1] * k); d[j + 2] = Math.min(255, c[2] * k); d[j + 3] = 255; }
+  }
+  function sw(css, txt, cls) { var r = document.createElement('div'); r.className = 'legrow'; var i = document.createElement('i'); i.className = cls || ''; i.style.cssText = css; r.appendChild(i); r.appendChild(document.createTextNode(txt)); return r; }
+  function legend() {
+    var c = A.current(), box = $('legBody'); box.innerHTML = ''; if (!c) return;
+    var sc = c.scene, on = S.mode === 'cls'; $('clsBtn').setAttribute('aria-pressed', String(on)); $('clsBtn').textContent = on ? 'Volver a la imagen en color' : 'Clasificar toda la imagen';
+    if (on) {
+      if (!CL || CL.map.length !== sc.w * sc.h) CL = classify(sc);
+      var tot = sc.w * sc.h - CL.cnt[0], g = PE.gsd(sc);
+      CLS.forEach(function (k, i) { if (!i || !CL.cnt[i]) return; var p = 100 * CL.cnt[i] / tot, a = g ? CL.cnt[i] * sc.pxArea : 0; box.appendChild(sw('background:rgb(' + k.c.join(',') + ')', k.n + ' · ' + (p < 0.1 ? 'menos de 0,1' : p < 1 ? nf1.format(p) : nf0.format(p)) + ' %' + (g ? ' · ' + (a >= 1e4 ? nf1.format(a / 1e4) + ' ha' : nf0.format(a) + ' m²') : ''))); });
+      var n = document.createElement('p'); n.className = 'legnote'; n.textContent = (sc.map.nir >= 0 ? 'Con infrarrojo: índices de agua, nieve y vegetación' + (sc.scl ? ', y la clasificación de nubes de Sentinel-2' : '') + '.' : 'Imagen sin infrarrojo: clases sólo por color y brillo; son aproximadas.') + ' Porcentajes sobre toda la imagen.'; box.appendChild(n);
+    } else box.appendChild(sw('background:#8fd8ea;border:1.5px solid #fff', 'Celeste: tiene color de guano'));
+    if (c.blobs) box.appendChild(sw('border:2px solid #ffe45c;border-radius:50%;background:none', NEST.on ? 'Círculo amarillo: nido marcado' : 'Círculo amarillo: ave contada'));
+    if (sc.roi && sc.roiOn) box.appendChild(sw('border:2px dashed #ffe45c;background:none', 'Recuadro de trazos: zona analizada'));
+    if (c.res.comps.length) box.appendChild(sw('background:#f0c419', 'Amarillo: grupo elegido'));
+    if (c.res.comps.some(function (k) { return k.isNew; })) box.appendChild(sw('border:2px solid #ff9d2e;border-radius:50%;background:none', 'Anillo naranja: grupo nuevo'));
+    if (X.base && sc.geo) box.appendChild(sw('background:linear-gradient(135deg,#31404a,#6b7a80)', 'Alrededor: base satelital de Esri'));
+  }
+  $('clsBtn').addEventListener('click', function () { var m = $('mode'); m.value = S.mode === 'cls' ? 'rgb' : 'cls'; m.dispatchEvent(new Event('change', { bubbles: true })); m.dispatchEvent(new Event('input', { bubbles: true })); setTimeout(legend, 30); });
+  $('mode').addEventListener('change', function () { setTimeout(legend, 30); });
+  $('legToggle').addEventListener('click', function () { var o = this.getAttribute('aria-expanded') !== 'true'; this.setAttribute('aria-expanded', String(o)); $('legBody').hidden = !o; $('clsBtn').hidden = !o; });
+  document.addEventListener('pc:result', function () { setTimeout(function () { if (S.mode === 'cls') { A.renderBase(); A.draw(); } legend(); }, 0); });
+
   /* ---------- ubicar: alejar hasta ver el entorno sobre la base ---------- */
   $('zWhere').addEventListener('click', function () {
     var sc = S.scene, g = sc && PE.gsd(sc); if (!sc || !sc.geo || !g) { A.toast('La imagen no tiene coordenadas: no se puede ubicar.'); return; }
@@ -154,7 +214,7 @@
     var sc = S.scene; if (sc && sc.geo) { var a = P(0, 0), b = P(sc.w, sc.h); if (b[0] - a[0] < 260) { ctx.strokeStyle = '#ffe45c'; ctx.lineWidth = 2; ctx.strokeRect(a[0] - 3, a[1] - 3, b[0] - a[0] + 6, b[1] - a[1] + 6); ctx.font = '600 12px "IBM Plex Sans", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; var t = 'Acá está la imagen (' + nf0.format(sc.w * PE.gsd(sc)) + ' m de ancho)'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(5,13,16,.9)'; ctx.strokeText(t, a[0], a[1] - 8); ctx.fillStyle = '#ffe45c'; ctx.fillText(t, a[0], a[1] - 8); } }
     over0(ctx, P);
   };
-  window.PCX = { under: under, over: function (c, P) { over(c, P); }, down: down, move: move, up: up, state: X, nests: nests, tap: tap, nest: NEST };
+  window.PCX = { classImage: classImage, classify: classify, under: under, over: function (c, P) { over(c, P); }, down: down, move: move, up: up, state: X, nests: nests, tap: tap, nest: NEST };
 
   /* ---------- fichas por grupo ---------- */
   function signal(sc, c, L) { // cuántos desvíos del suelo común se aparta el grupo en rojo y en rosado
