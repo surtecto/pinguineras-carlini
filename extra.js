@@ -107,7 +107,54 @@
     [[a[0], a[1]], [mx, a[1]], [c[0], a[1]], [a[0], my], [c[0], my], [a[0], c[1]], [mx, c[1]], [c[0], c[1]]].forEach(function (h) { ctx.fillRect(h[0] - 5, h[1] - 5, 10, 10); ctx.strokeRect(h[0] - 5, h[1] - 5, 10, 10); });
     var g = PE.gsd(sc); if (g) { var t = nf0.format(Math.abs(b[2] - b[0]) * g) + ' × ' + nf0.format(Math.abs(b[3] - b[1]) * g) + ' m'; ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(5,13,16,.85)'; ctx.strokeText(t, a[0] + 2, a[1] - 4); ctx.fillStyle = '#ffe45c'; ctx.fillText(t, a[0] + 2, a[1] - 4); }
   }
-  window.PCX = { under: under, over: over, down: down, move: move, up: up, state: X };
+  /* ---------- nidos en imágenes de dron: borrador automático más corrección a mano ---------- */
+  var NEST = { on: false, diam: 0.65, c: 0.14, add: [], del: [], auto: 0 };
+  function nests(sc) {
+    var g = PE.gsd(sc); if (!NEST.on || !g || g > 0.15) return null;
+    var within = sc.roi && sc.roiOn ? sc.roi : null, rad = NEST.diam / g * 0.6;
+    var pts = PE.detectNests(sc, { diamPx: NEST.diam / g, c: NEST.c, within: within }); NEST.auto = pts.length;
+    pts = pts.filter(function (p) { return !NEST.del.some(function (d) { return Math.hypot(d[0] - p.x, d[1] - p.y) < rad; }); });
+    NEST.add.forEach(function (a) { pts.push({ x: a[0], y: a[1], s: 0, manual: true }); });
+    S.ind.diam = NEST.diam; return pts;
+  }
+  function tap(im) { // tocar un círculo lo quita; tocar fuera agrega un nido
+    if (!NEST.on || !S.blobs) return false;
+    var g = PE.gsd(S.scene), rad = NEST.diam / g * 0.6, best = -1, bd = rad;
+    S.blobs.forEach(function (b, i) { var d = Math.hypot(b.x - im[0], b.y - im[1]); if (d < bd) { bd = d; best = i; } });
+    if (best >= 0) { var b = S.blobs[best]; if (b.manual) NEST.add = NEST.add.filter(function (a) { return a[0] !== b.x || a[1] !== b.y; }); else NEST.del.push([b.x, b.y]); }
+    else NEST.add.push([im[0], im[1]]);
+    A.schedule(0); return true;
+  }
+  function nestUI() {
+    var sc = S.scene, g = sc && PE.gsd(sc), can = !!g && g <= 0.15;
+    $('nestBox').hidden = !can; $('nestOn').checked = NEST.on; $('nestCtl').hidden = !NEST.on;
+    $('oNestD').textContent = String(NEST.diam.toFixed(2)).replace('.', ',') + ' m'; $('oNestC').textContent = String(NEST.c.toFixed(2)).replace('.', ',');
+    if (NEST.on && S.blobs) $('nestSum').textContent = nf0.format(S.blobs.length) + ' nidos marcados: ' + nf0.format(NEST.auto) + ' del borrador automático, ' + NEST.del.length + ' quitados y ' + NEST.add.length + ' agregados a mano.';
+  }
+  $('nestOn').addEventListener('change', function () { NEST.on = this.checked; if (NEST.on) { S.ovStyle = 'edge'; $('ovStyle').value = 'edge'; } nestUI(); A.schedule(0); });
+  $('nestDiam').addEventListener('input', function () { NEST.diam = +this.value; nestUI(); A.schedule(150); });
+  $('nestC').addEventListener('input', function () { NEST.c = +this.value; nestUI(); A.schedule(150); });
+  $('nestClear').addEventListener('click', function () { NEST.add = []; NEST.del = []; A.schedule(0); });
+  $('nestCsv').addEventListener('click', function () {
+    if (!S.blobs || !S.blobs.length) { A.toast('No hay nidos marcados.'); return; }
+    var rows = ['n,x_px,y_px,lon,lat,origen']; S.blobs.forEach(function (b, i) { var p = A.lonlat(b.x, b.y); rows.push([i + 1, (b.x * S.down).toFixed(1), (b.y * S.down).toFixed(1), p ? p[0].toFixed(7) : '', p ? p[1].toFixed(7) : '', b.manual ? 'a mano' : 'automático'].join(',')); });
+    A.save('nidos.csv', rows.join('\n'), 'text/csv');
+  });
+  document.addEventListener('pc:scene', function () { var sc = S.scene, g = sc && PE.gsd(sc); NEST.add = []; NEST.del = []; NEST.on = !!g && g <= 0.05; if (NEST.on) { S.ovStyle = 'edge'; $('ovStyle').value = 'edge'; } nestUI(); });
+  document.addEventListener('pc:result', function () { setTimeout(nestUI, 0); });
+
+  /* ---------- ubicar: alejar hasta ver el entorno sobre la base ---------- */
+  $('zWhere').addEventListener('click', function () {
+    var sc = S.scene, g = sc && PE.gsd(sc); if (!sc || !sc.geo || !g) { A.toast('La imagen no tiene coordenadas: no se puede ubicar.'); return; }
+    var r = A.cv.getBoundingClientRect(), span = Math.max(4000, sc.w * g * 3), k = r.width / (span / g);
+    S.view = { k: k, x: r.width / 2 - sc.w / 2 * k, y: r.height / 2 - sc.h / 2 * k }; X.base = true; $('baseOn').checked = true; A.draw();
+  });
+  var over0 = over;
+  over = function (ctx, P) { // cuando la imagen se ve chica, su contorno y su nombre
+    var sc = S.scene; if (sc && sc.geo) { var a = P(0, 0), b = P(sc.w, sc.h); if (b[0] - a[0] < 260) { ctx.strokeStyle = '#ffe45c'; ctx.lineWidth = 2; ctx.strokeRect(a[0] - 3, a[1] - 3, b[0] - a[0] + 6, b[1] - a[1] + 6); ctx.font = '600 12px "IBM Plex Sans", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; var t = 'Acá está la imagen (' + nf0.format(sc.w * PE.gsd(sc)) + ' m de ancho)'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(5,13,16,.9)'; ctx.strokeText(t, a[0], a[1] - 8); ctx.fillStyle = '#ffe45c'; ctx.fillText(t, a[0], a[1] - 8); } }
+    over0(ctx, P);
+  };
+  window.PCX = { under: under, over: function (c, P) { over(c, P); }, down: down, move: move, up: up, state: X, nests: nests, tap: tap, nest: NEST };
 
   /* ---------- fichas por grupo ---------- */
   function signal(sc, c, L) { // cuántos desvíos del suelo común se aparta el grupo en rojo y en rosado

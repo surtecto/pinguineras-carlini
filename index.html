@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body class="app">
 
@@ -50,6 +50,7 @@
         <div class="zoom">
           <button class="btn icon" id="zIn" type="button" aria-label="Acercar">+</button>
           <button class="btn icon" id="zOut" type="button" aria-label="Alejar">−</button>
+          <button class="btn icon" id="zWhere" type="button" aria-label="Alejar para ver dónde está la imagen">Ubicar</button>
           <button class="btn icon" id="zFit" type="button" aria-label="Ver la imagen completa">Todo</button>
           <button class="btn icon" id="zZone" type="button" aria-label="Ir a la zona de la colonia">Colonia</button>
         </div>
@@ -187,6 +188,17 @@
           </details>
         </div>
 
+        <div id="nestBox" class="col" hidden>
+          <h3>Nidos (imágenes de dron)</h3>
+          <label class="check"><input id="nestOn" type="checkbox"> Contar nidos: discos oscuros sobre suelo sin nieve</label>
+          <div id="nestCtl" class="col" hidden>
+            <p class="callout" id="nestSum"></p>
+            <p class="hint"><b>El conteo automático es un borrador.</b> Tocar un círculo lo quita; tocar un nido sin marcar lo agrega. Así el número final es el que se revisó a mano.</p>
+            <div class="slider"><label for="nestDiam">Diámetro del nido <output id="oNestD"></output></label><input id="nestDiam" type="range" min="0.4" max="0.8" step="0.01" value="0.65"></div>
+            <div class="slider"><label for="nestC">Exigencia: cuánto más oscuro que su entorno <output id="oNestC"></output></label><input id="nestC" type="range" min="0.06" max="0.3" step="0.01" value="0.14"></div>
+            <div class="row"><button class="btn" id="nestClear" type="button">Quitar mis correcciones</button><button class="btn" id="nestCsv" type="button">Bajar los nidos (CSV)</button></div>
+          </div>
+        </div>
         <h3>Zona de análisis</h3>
         <label class="check" id="roiRow" hidden><input id="roiOn" type="checkbox"> <span id="roiLbl">Analizar sólo la zona de interés</span></label>
         <div class="row">
@@ -556,13 +568,13 @@
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>window.PC_WEB = true;</script>
-<script src="data.js?v=8"></script>
-<script src="engine.js?v=8"></script>
-<script src="app.js?v=8"></script>
-<script src="extra.js?v=8"></script>
+<script src="data.js?v=9"></script>
+<script src="engine.js?v=9"></script>
+<script src="app.js?v=9"></script>
+<script src="extra.js?v=9"></script>
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="tiempo.js?v=8"></script>
-<script src="sentinel.js?v=8"></script>
-<script src="ui.js?v=8"></script>
+<script src="tiempo.js?v=9"></script>
+<script src="sentinel.js?v=9"></script>
+<script src="ui.js?v=9"></script>
 </body>
 </html>

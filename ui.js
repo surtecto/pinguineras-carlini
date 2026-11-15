@@ -38,8 +38,8 @@
     box.className = 'status' + (n ? '' : ' zero');
     $('zZone').hidden = !(sc.roi && sc.roiBox);
     if (n) {
-      sum.textContent = $('kArea').textContent + ' con color de guano · ' + n + (n === 1 ? ' grupo' : ' grupos') + (c.blobs ? ' · ' + c.blobs.length + ' aves contadas' : '');
-    } else sum.textContent = 'No se detectó guano';
+      sum.textContent = $('kArea').textContent + ' con color de guano · ' + n + (n === 1 ? ' grupo' : ' grupos') + (c.blobs ? ' · ' + c.blobs.length + (window.PCX && window.PCX.nest.on ? ' nidos marcados' : ' aves contadas') : '');
+    } else sum.textContent = c.blobs && window.PCX && window.PCX.nest.on ? c.blobs.length + ' nidos marcados · sin color de guano' : 'No se detectó guano';
     var msg;
     if (ml) {
       if (!g) msg = 'Modo con ejemplos: tocar en la imagen una mancha de guano, rosada o rojiza. Arrastrar sigue moviendo la imagen.';
@@ -54,7 +54,8 @@
       msg = 'Detección automática lista: lo celeste tiene color de guano' + (sc.roi && sc.roiOn ? ', dentro del recuadro de trazos' : '') + '. Tocar una mancha muestra sus datos; en «Detección» se ajusta si sobra o falta.';
       if (sc.synthetic) msg = 'Imagen inventada para practicar. ' + msg;
     }
-    if (sc.src && sc.down > 1.2) msg = 'Vista general: la imagen original se redujo ' + String(Math.round(sc.down * 10) / 10).replace('.', ',') + ' veces para entrar en pantalla. Para trabajar con todo el detalle, en «Detección» marcar una zona y pulsar «Ver la zona a resolución completa». ' + (n ? '' : '');
+    if (window.PCX && window.PCX.nest.on && c.blobs) msg = 'Imagen de dron: los círculos amarillos son nidos (discos oscuros sobre suelo sin nieve). Es un borrador: tocar un círculo lo quita y tocar un nido sin marcar lo agrega. Lo celeste es el borde teñido de guano, no los nidos. «Ubicar» muestra dónde está la imagen.';
+    else if (sc.src && sc.down > 1.2) msg = 'Vista general: la imagen original se redujo ' + String(Math.round(sc.down * 10) / 10).replace('.', ',') + ' veces para entrar en pantalla. Para trabajar con todo el detalle, en «Detección» marcar una zona y pulsar «Ver la zona a resolución completa». ' + (n ? '' : '');
     else if (sc.parent) msg = 'Recorte a resolución completa de la zona marcada. ' + msg + ' «Volver a la imagen completa» está en «Detección».';
     diag.textContent = msg;
     hint.innerHTML = '';

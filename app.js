@@ -312,6 +312,7 @@
         if (S.ind.guano) within = PE.dilate(S.res.mask, sc.w, sc.h, Math.max(1, Math.round(1 / g)));
         S.blobs = PE.detectBlobs(sc, { diamPx: S.ind.diam / g, k: S.ind.k, within: within });
       }
+      if (window.PCX && window.PCX.nests) { var nb = window.PCX.nests(sc); if (nb) S.blobs = nb; }
       if (S.sel > S.res.comps.length) S.sel = 0;
       paintOverlay(); updateResults(warn); draw(); busy(null);
       document.dispatchEvent(new CustomEvent('pc:result', { detail: { run: true } }));
@@ -409,7 +410,7 @@
   }
 
   /* ---------- visor ---------- */
-  function minK() { var r = cv.getBoundingClientRect(), sc = S.scene; return Math.min(r.width / sc.w, r.height / sc.h) * 0.5; }
+  function minK() { var r = cv.getBoundingClientRect(), sc = S.scene; return Math.min(r.width / sc.w, r.height / sc.h) * (sc.geo ? 0.003 : 0.5); } // con georreferencia se puede alejar hasta ver el entorno sobre la base
   function fitView(zone) {
     var r = cv.getBoundingClientRect(), sc = S.scene; if (!sc || !r.width) return;
     var bx = [0, 0, sc.w, sc.h];
@@ -523,6 +524,8 @@
         $('measureBox').hidden = false; $('measureM').focus();
       } else { $('measureTxt').textContent = 'Marcar el segundo punto.'; $('measureBox').hidden = false; }
       draw();
+    } else if (inside && window.PCX && window.PCX.tap && window.PCX.tap(im)) {
+      /* nido agregado o quitado a mano */
     } else if (S.method === 'ml' && inside) {
       addSample(im[0], im[1]);
     } else if (inside && S.res) {

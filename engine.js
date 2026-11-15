@@ -447,6 +447,33 @@
     return pts;
   };
 
+  /* Nidos en imágenes de dron: discos oscuros de tamaño fijo sobre suelo sin nieve.
+     Contraste relativo centro–entorno (sirve también dentro de un manchón oscuro) y un solo máximo por nido. */
+  PE.detectNests = function (s, o) {
+    var w = s.w, h = s.h, N = w * h, m = s.map, inv = 1 / s.ref;
+    var R = s.bands[m.r], G = s.bands[m.g], B = s.bands[m.b], L = new Float32Array(N), i;
+    for (i = 0; i < N; i++) L[i] = (R[i] + G[i] + B[i]) * inv / 3;
+    var d = Math.max(4, o.diamPx), r1 = Math.max(1, Math.round(d * 0.14)), r2 = Math.max(r1 + 2, Math.round(d * 0.5)), r3 = Math.round(d * 2.2);
+    var core = boxBlur(boxBlur(L, w, h, r1), w, h, r1), bg = boxBlur(boxBlur(L, w, h, r2), w, h, r2), big = boxBlur(boxBlur(L, w, h, r3), w, h, r3);
+    var smp = [], step = Math.max(1, Math.floor(N / 60000)); for (i = 0; i < N; i += step) if (!s.valid || s.valid[i]) smp.push(L[i]);
+    var sv = Float32Array.from(smp); sv.sort(); var snow = pct(sv, 90), lim = 0.62 * snow;
+    var resp = new Float32Array(N); for (i = 0; i < N; i++) resp[i] = (bg[i] - core[i]) / (bg[i] + core[i] + 0.02);
+    var cand = [], y, x;
+    for (y = r2; y < h - r2; y++) for (x = r2; x < w - r2; x++) {
+      i = y * w + x; var v = resp[i];
+      if (v < o.c || big[i] > lim || (s.valid && !s.valid[i]) || (o.within && !o.within[i])) continue;
+      if (v >= resp[i - 1] && v >= resp[i + 1] && v >= resp[i - w] && v >= resp[i + w]) cand.push([v, x, y]);
+    }
+    cand.sort(function (a, b) { return b[0] - a[0]; });
+    var sep = d * 0.75, cell = Math.max(1, Math.ceil(sep)), gw = Math.ceil(w / cell), grid = {}, pts = [];
+    cand.forEach(function (c) { // de mayor a menor contraste, sin dos nidos a menos de tres cuartos de diámetro
+      var gx = Math.floor(c[1] / cell), gy = Math.floor(c[2] / cell), ok = true;
+      for (var dy = -1; dy <= 1 && ok; dy++) for (var dx = -1; dx <= 1; dx++) { var q = grid[(gy + dy) * gw + gx + dx]; if (q) for (var k = 0; k < q.length; k++) if (Math.hypot(q[k].x - c[1], q[k].y - c[2]) < sep) { ok = false; break; } if (!ok) break; }
+      if (!ok) return; var p = { x: c[1] + 0.5, y: c[2] + 0.5, s: c[0] * 100 }; pts.push(p); (grid[gy * gw + gx] = grid[gy * gw + gx] || []).push(p);
+    });
+    return pts;
+  };
+
   /* ---------- georreferencia ---------- */
   var WGS_A = 6378137, WGS_F = 1 / 298.257223563, E2 = WGS_F * (2 - WGS_F), E1 = Math.sqrt(E2);
   var D2R = Math.PI / 180;
