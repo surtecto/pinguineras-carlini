@@ -66,6 +66,14 @@
   async function readBanded(im, win, t, n) {
     var W = win[2] - win[0], H = win[3] - win[1], f = H / t.h, ro = Math.max(1, Math.floor(16e6 / (W * f))), out = [];
     for (var b = 0; b < n; b++) out.push(new Float32Array(t.w * t.h));
+    if (im.getTileHeight() <= 4 && f >= 2) { // TIFF en tiras de una fila (típico de Pix4D): alcanza con leer una fila de cada tantas
+      for (var r = 0; r < t.h; r++) {
+        var sy = Math.min(win[3] - 1, win[1] + Math.floor((r + 0.5) * f)), line = await im.readRasters({ window: [win[0], sy, win[2], sy + 1], width: t.w, height: 1, resampleMethod: 'nearest', interleave: false });
+        for (b = 0; b < n; b++) out[b].set(line[b], r * t.w);
+        if (r % 40 === 0) { busy('Armando la vista general de una imagen de ' + nf0.format(W * H / 1e6) + ' megapíxeles… ' + Math.round(100 * r / t.h) + ' %'); await new Promise(function (res) { setTimeout(res, 0); }); }
+      }
+      return out;
+    }
     for (var oy = 0; oy < t.h; oy += ro) {
       var o1 = Math.min(t.h, oy + ro), y0 = win[1] + Math.round(oy * f), y1 = win[1] + Math.max(Math.round(oy * f) + 1, Math.round(o1 * f));
       var part = await im.readRasters({ window: [win[0], y0, win[2], Math.min(win[3], y1)], width: t.w, height: o1 - oy, resampleMethod: 'nearest', interleave: false });
